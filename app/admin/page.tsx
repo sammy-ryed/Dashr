@@ -106,6 +106,36 @@ export default function AdminPage() {
     setActionLoading('');
   }
 
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [loggingOut2, setLoggingOut2] = useState(false);
+
+  async function handleAdminLogout() {
+    setLoggingOut2(true);
+    localStorage.removeItem('dashr_session_start');
+    localStorage.removeItem('dashr_last_activity');
+    await supabase.auth.signOut();
+    router.push('/login');
+  }
+
+  // Session management: 16hr auto-logout
+  useEffect(() => {
+    const SESSION_KEY = 'dashr_session_start';
+    const SESSION_MAX_MS = 16 * 60 * 60 * 1000;
+    if (typeof window === 'undefined') return;
+    if (!localStorage.getItem(SESSION_KEY)) {
+      localStorage.setItem(SESSION_KEY, Date.now().toString());
+    }
+    const interval = setInterval(async () => {
+      const sessionStart = Number(localStorage.getItem(SESSION_KEY) || Date.now());
+      if (Date.now() - sessionStart > SESSION_MAX_MS) {
+        localStorage.removeItem(SESSION_KEY);
+        await supabase.auth.signOut();
+        router.push('/login');
+      }
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
   const filteredOrders = statusFilter === 'all' ? orders : orders.filter((o) => o.status === statusFilter);
 
   if (loading) return (
@@ -121,7 +151,48 @@ export default function AdminPage() {
         <ul className="nav-links">
           <li><span style={{ fontFamily: 'var(--mono)', fontSize: '0.7rem', color: 'var(--yellow)', padding: '0 1rem' }}>Admin</span></li>
         </ul>
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
+          <button
+            className="hamburger hamburger-always"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Toggle menu"
+          >
+            <span className={`hamburger-line ${menuOpen ? 'open' : ''}`} />
+            <span className={`hamburger-line ${menuOpen ? 'open' : ''}`} />
+            <span className={`hamburger-line ${menuOpen ? 'open' : ''}`} />
+          </button>
+        </div>
       </nav>
+
+      {/* Slide-out menu */}
+      {menuOpen && (
+        <div className="mobile-menu" onClick={() => setMenuOpen(false)}>
+          <div className="mobile-menu-inner" onClick={(e) => e.stopPropagation()}>
+            <div style={{ padding: '1.4rem', borderBottom: '0.14rem solid #2a2a2a' }}>
+              <div className="nav-logo" style={{ padding: 0, fontSize: '1.4rem' }}>
+                DASHR<sup>SRM</sup>
+              </div>
+              <div style={{ marginTop: '0.6rem' }}>
+                <div className="type-label" style={{ color: 'var(--yellow)' }}>Admin Panel</div>
+              </div>
+            </div>
+            <div style={{ padding: '0.8rem 0', flex: 1 }}>
+              <a href="/admin" className="mobile-menu-link active" onClick={() => setMenuOpen(false)}>
+                Dashboard
+              </a>
+            </div>
+            <div style={{ padding: '1.2rem 1.4rem', borderTop: '0.14rem solid #2a2a2a' }}>
+              <button
+                className="btn btn-danger btn-block btn-sm"
+                onClick={handleAdminLogout}
+                disabled={loggingOut2}
+              >
+                {loggingOut2 ? <span className="spinner" style={{ width: '0.8rem', height: '0.8rem' }} /> : 'Sign Out'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats bar */}
       <div className="admin-bar">
@@ -143,7 +214,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      <div style={{ padding: '2rem clamp(1rem,5vw,4rem)' }}>
+      <div className="page-enter" style={{ padding: '2rem clamp(1rem,5vw,4rem)' }}>
         {/* Tabs */}
         <div className="flex-row" style={{ marginBottom: '2rem' }}>
           {(['orders', 'agents', 'payouts'] as const).map((t) => (
@@ -220,12 +291,21 @@ export default function AdminPage() {
                 <div style={{ flex: 1 }}>
                   <div className="agent-name" style={!agent.is_verified ? { color: 'var(--danger)' } : {}}>{agent.name}</div>
                   <div className="agent-meta">★ {agent.rating?.toFixed(1)} · {agent.total_deliveries} deliveries · {agent.srm_id || 'No ID'}</div>
+                  {agent.id_card_url && (
+                    <a href={agent.id_card_url} target="_blank" rel="noreferrer" className="type-mono" style={{ fontSize: '0.65rem', color: 'var(--blue)', textDecoration: 'none', display: 'inline-block', marginTop: '0.2rem' }}>
+                      View ID Card ↗
+                    </a>
+                  )}
                   <div className="strike-row">
                     <span className="type-label">Strikes:</span>
                     {Array.from({ length: 3 }, (_, i) => (
                       <div key={i} className={`strike-dot ${i < agent.strikes ? 'hit' : ''}`} />
                     ))}
-                    {!agent.is_verified && <span className="badge badge-r" style={{ marginLeft: '0.3rem' }}>Offboarded</span>}
+                    {!agent.is_verified && (
+                      <span className={`badge ${agent.strikes >= 3 ? 'badge-r' : 'badge-y'}`} style={{ marginLeft: '0.5rem' }}>
+                        {agent.strikes >= 3 ? 'Offboarded' : 'Pending Verification'}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>

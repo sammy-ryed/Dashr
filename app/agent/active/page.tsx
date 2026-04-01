@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
+import AgentShell from '@/components/AgentShell';
+import RatingModal from '@/components/RatingModal';
 import type { Order } from '@/types';
 
 export default function AgentActivePage() {
@@ -15,18 +17,19 @@ export default function AgentActivePage() {
   const [agentId, setAgentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [upiConfirmed, setUpiConfirmed] = useState(false);
   const [error, setError] = useState('');
+  const [showRating, setShowRating] = useState(false);
+  const [justDeliveredOrder, setJustDeliveredOrder] = useState<{ id: string; customerName: string; customerId: string } | null>(null);
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
+      if (!user) return;
       setAgentId(user.id);
 
       const { data } = await supabase
         .from('orders')
-        .select('*')
+        .select('*, customer:customer_id(id, name, phone)')
         .eq('agent_id', user.id)
         .in('status', ['assigned', 'picked_up'])
         .order('created_at', { ascending: false })
@@ -49,17 +52,11 @@ export default function AgentActivePage() {
 
   async function markDelivered() {
     if (!order || !agentId) return;
-    if (order.payment_method === 'upi_on_delivery' && !upiConfirmed) {
-      setError('Please confirm UPI payment collected before marking as delivered.');
-      return;
-    }
     setUpdating(true);
     setError('');
 
-    // Update order
     await supabase.from('orders').update({ status: 'delivered' }).eq('id', order.id);
 
-    // Log commission to ledger
     const weekStart = (() => {
       const d = new Date();
       const day = d.getDay();
@@ -70,53 +67,45 @@ export default function AgentActivePage() {
     const ledgerEntries = [
       { agent_id: agentId, order_id: order.id, type: 'commission', amount: order.commission_amount, week_start: weekStart },
     ];
-    if (order.payment_method === 'agent_float') {
-      ledgerEntries.push({ agent_id: agentId, order_id: order.id, type: 'reimbursement', amount: order.order_value, week_start: weekStart });
-    }
     await supabase.from('ledger').insert(ledgerEntries);
 
-    // Increment total_deliveries
     const { data: currentUser } = await supabase.from('users').select('total_deliveries').eq('id', agentId).single();
     await supabase.from('users').update({ total_deliveries: (currentUser?.total_deliveries || 0) + 1 }).eq('id', agentId);
 
+    const customerInfo = (order as any).customer;
+    setJustDeliveredOrder({
+      id: order.id,
+      customerName: customerInfo?.name || 'Customer',
+      customerId: customerInfo?.id || order.customer_id,
+    });
+
     setOrder(null);
-    router.push('/agent/dashboard');
+    setUpdating(false);
+    setShowRating(true);
   }
 
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <span className="spinner" style={{ width: '2.5rem', height: '2.5rem' }} />
-    </div>
-  );
-
   const shortId = order?.id.slice(-4).toUpperCase();
+  const customerInfo = order ? (order as any).customer : null;
 
   return (
-    <div>
-      <nav className="nav">
-        <span className="nav-logo">DASHR<sup>SRM</sup></span>
-        <ul className="nav-links">
-          <li><Link href="/agent/dashboard">Feed</Link></li>
-          <li><Link href="/agent/active" className="active">Active</Link></li>
-          <li><Link href="/agent/ledger">Ledger</Link></li>
-        </ul>
-      </nav>
+    <AgentShell>
+      <div className="dash-topbar">
+        <div className="dash-title">Active Delivery</div>
+      </div>
 
-      <div style={{ padding: '2rem clamp(1rem,5vw,4rem)', maxWidth: '40rem', margin: '0 auto' }}>
-        <div style={{ marginBottom: '2rem' }}>
-          <div className="type-label" style={{ marginBottom: '0.5rem' }}>Active Delivery</div>
-          <div className="type-h1">Current <span style={{ color: 'var(--yellow)' }}>Job.</span></div>
-        </div>
-
-        {!order ? (
-          <div style={{ textAlign: 'center', padding: '3rem 0' }}>
+      <div className="dash-feed" style={{ padding: '1.5rem' }}>
+        {loading ? (
+          <div style={{ padding: '3rem', textAlign: 'center' }}>
+            <span className="spinner" style={{ width: '2rem', height: '2rem' }} />
+          </div>
+        ) : !order && !showRating ? (
+          <div style={{ textAlign: 'center', padding: '4rem 0' }}>
             <div className="type-h2" style={{ marginBottom: '1rem' }}>No active delivery</div>
             <div className="type-label" style={{ marginBottom: '1.5rem' }}>Accept an order from the live feed</div>
-            <Link href="/agent/dashboard" className="btn btn-primary btn-lg">Go to Live Feed →</Link>
+            <Link href="/agent/dashboard" className="btn btn-primary btn-lg">Go to Live Feed</Link>
           </div>
-        ) : (
-          <>
-            {/* Order details card */}
+        ) : order ? (
+          <div style={{ maxWidth: '40rem' }}>
             <div className="order-card" style={{ marginBottom: '1.5rem' }}>
               <div className="oc-head">
                 <span className="oc-id">ORDER_#{shortId}</span>
@@ -125,65 +114,79 @@ export default function AgentActivePage() {
                 </span>
               </div>
               <div className="oc-title">{order.item_description}</div>
-              <div className="oc-meta" style={{ marginTop: '0.5rem' }}>📍 Pickup: {order.pickup_location}</div>
-              <div className="oc-meta">🏠 Deliver: {order.delivery_hostel}, Room {order.delivery_room}</div>
-              <div className="oc-meta">📦 Order value: ₹{order.order_value}</div>
+              <div className="oc-meta" style={{ marginTop: '0.5rem' }}>Pickup: {order.pickup_location}</div>
+              <div className="oc-meta">Deliver to: {order.delivery_hostel}, Room {order.delivery_room}</div>
+              <div className="oc-meta">Order value: ₹{order.order_value}</div>
+
+              {customerInfo && (
+                <div style={{ marginTop: '0.8rem', padding: '0.7rem', background: 'var(--surf2)', border: '0.12rem solid #333' }}>
+                  <div className="type-label" style={{ marginBottom: '0.4rem' }}>Customer Contact</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '0.75rem', color: 'var(--white)' }}>
+                    {customerInfo.name}
+                  </div>
+                  {customerInfo.phone && (
+                    <a href={`tel:${customerInfo.phone}`} className="btn btn-sm btn-ghost" style={{ marginTop: '0.5rem', fontSize: '0.6rem' }}>
+                      📞 Call {customerInfo.phone}
+                    </a>
+                  )}
+                </div>
+              )}
+
               <div className="oc-foot">
                 <div>
                   <div className="oc-comm">₹{order.commission_amount}</div>
-                  <div className="type-label" style={{ marginTop: '0.3rem' }}>your commission</div>
+                  <div className="type-label" style={{ marginTop: '0.3rem' }}>Your commission</div>
                 </div>
                 <span className={order.payment_method === 'agent_float' ? 'badge badge-w' : 'badge badge-r'}>
-                  {order.payment_method === 'agent_float' ? 'Agent Float' : 'UPI On Delivery'}
+                  {order.payment_method === 'agent_float' ? 'Dasher Float' : 'UPI On Delivery'}
                 </span>
               </div>
             </div>
 
-            {/* UPI reminder */}
-            {order.payment_method === 'upi_on_delivery' && order.status === 'picked_up' && (
-              <div className="notice notice-y" style={{ marginBottom: '1.5rem' }}>
-                <div style={{ marginBottom: '0.7rem' }}>
-                  💳 Collect UPI payment of <strong>₹{order.order_value}</strong> from customer before marking delivered.
-                </div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontFamily: 'var(--mono)', fontSize: '0.68rem' }}>
-                  <input type="checkbox" checked={upiConfirmed} onChange={(e) => setUpiConfirmed(e.target.checked)} />
-                  I have collected the UPI payment
-                </label>
+            {order.payment_method === 'agent_float' && (
+              <div className="notice notice-g" style={{ marginBottom: '1.5rem' }}>
+                You paid ₹{order.order_value} upfront. Customer pays you ₹{order.order_value + order.commission_amount} on delivery.
               </div>
             )}
 
-            {order.payment_method === 'agent_float' && (
-              <div className="notice notice-g" style={{ marginBottom: '1.5rem' }}>
-                💰 You paid upfront. ₹{order.order_value + order.commission_amount} will be reimbursed in your next weekly payout.
+            {order.payment_method === 'upi_on_delivery' && (
+              <div className="notice notice-y" style={{ marginBottom: '1.5rem' }}>
+                Customer pays ₹{order.order_value} directly to you on delivery. Your commission: ₹{order.commission_amount}.
               </div>
             )}
 
             {error && <div className="notice notice-r" style={{ marginBottom: '1.5rem' }}>{error}</div>}
 
-            {/* Action buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {order.status === 'assigned' && (
-                <button
-                  className="btn btn-ghost btn-lg btn-block"
-                  onClick={markPickedUp}
-                  disabled={updating}
-                >
-                  {updating ? <span className="spinner" /> : 'Mark Picked Up →'}
+                <button className="btn btn-ghost btn-lg btn-block" onClick={markPickedUp} disabled={updating}>
+                  {updating ? <span className="spinner" /> : 'Mark Picked Up'}
                 </button>
               )}
               {order.status === 'picked_up' && (
-                <button
-                  className="btn btn-primary btn-lg btn-block"
-                  onClick={markDelivered}
-                  disabled={updating || (order.payment_method === 'upi_on_delivery' && !upiConfirmed)}
-                >
+                <button className="btn btn-primary btn-lg btn-block" onClick={markDelivered} disabled={updating}>
                   {updating ? <span className="spinner" /> : 'Mark Delivered ✓'}
                 </button>
               )}
             </div>
-          </>
+          </div>
+        ) : null}
+
+        {showRating && justDeliveredOrder && agentId && (
+          <RatingModal
+            orderId={justDeliveredOrder.id}
+            raterId={agentId}
+            ratedName={justDeliveredOrder.customerName}
+            raterRole="dasher"
+            onClose={() => {
+              setShowRating(false);
+              setJustDeliveredOrder(null);
+              router.push('/agent/dashboard');
+            }}
+            onSubmitted={() => {}}
+          />
         )}
       </div>
-    </div>
+    </AgentShell>
   );
 }

@@ -2,36 +2,48 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
-import { ORDER_STATUS_STEPS } from '@/lib/constants';
+import { ORDER_STATUS_STEPS, FEATURES, UPI_ID } from '@/lib/config';
 import Nav from '@/components/Nav';
+import RatingModal from '@/components/RatingModal';
 import type { Order } from '@/types';
-import QRCode from 'react-qr-code';
-
-const DASHR_UPI_ID = 'dashr@upi'; // Replace with actual UPI ID
 
 export default function OrderStatusPage() {
   const { id } = useParams() as { id: string };
+  const router = useRouter();
   const supabase = createClient();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<{ name: string; role: string } | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [user, setUser] = useState<{ id: string; name: string; role: string } | null>(null);
+  const [cancelError, setCancelError] = useState('');
+  const [showRating, setShowRating] = useState(false);
+  const [hasRated, setHasRated] = useState(false);
 
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase.from('users').select('name, role').eq('id', user.id).single();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        const { data: profile } = await supabase.from('users').select('name, role').eq('id', authUser.id).single();
         const p = profile as { name: string; role: string } | null;
-        if (p) setUser({ name: p.name, role: p.role });
+        if (p) setUser({ id: authUser.id, name: p.name, role: p.role });
+
+        // Check if user already rated this order
+        const { data: existingRating } = await supabase
+          .from('ratings')
+          .select('id')
+          .eq('order_id', id)
+          .eq('rater_id', authUser.id)
+          .single();
+        if (existingRating) setHasRated(true);
       }
 
-      // Load order + agent info
       const { data } = await supabase
         .from('orders')
-        .select('*, agent:agent_id(id, name, rating)')
+        .select('*, agent:agent_id(id, name, rating, phone)')
         .eq('id', id)
         .single();
       setOrder(data as Order);
@@ -39,7 +51,6 @@ export default function OrderStatusPage() {
     }
     init();
 
-    // Realtime subscription
     const channel = supabase
       .channel(`order-${id}`)
       .on('postgres_changes', {
@@ -54,6 +65,24 @@ export default function OrderStatusPage() {
 
     return () => { supabase.removeChannel(channel); };
   }, [id]);
+
+  async function cancelOrder() {
+    if (!order || !user) return;
+    setCancelling(true);
+    setCancelError('');
+
+    try {
+      const res = await fetch('/api/orders/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id, userId: user.id }),
+      });
+      const data = await res.json();
+      if (!data.ok) { setCancelError(data.error || 'Failed to cancel'); }
+      else { setOrder((prev) => prev ? { ...prev, status: 'cancelled' } : null); }
+    } catch { setCancelError('Network error.'); }
+    setCancelling(false);
+  }
 
   if (loading) {
     return (
@@ -74,19 +103,19 @@ export default function OrderStatusPage() {
   const currentStepIdx = ORDER_STATUS_STEPS.findIndex((s) => s.key === order.status);
   const shortId = order.id.slice(-4).toUpperCase();
   const agentInfo = order.agent as any;
-
-  const upiPaymentString = `upi://pay?pa=${DASHR_UPI_ID}&pn=DASHR&am=${order.order_value}&cu=INR&tn=DASHR_ORDER_${shortId}`;
+  const isTerminal = order.status === 'delivered' || order.status === 'cancelled';
 
   return (
     <>
-      <Nav role={user?.role as 'customer'} userName={user?.name} />
+      <Nav role={user?.role as 'customer'} userName={user?.name} isLoading={loading} />
 
-      <div style={{ padding: '2rem clamp(1rem,5vw,4rem)', maxWidth: '56rem', margin: '0 auto' }}>
+      <div className="page-enter" style={{ padding: '2rem clamp(1rem,5vw,4rem)', maxWidth: '72rem', margin: '0 auto' }}>
         <div style={{ marginBottom: '2rem' }}>
-          <div className="type-label" style={{ marginBottom: '0.5rem' }}>Live Order Status</div>
+          <div className="sec-label">Live Order Status</div>
           <div className="type-h1">Track Your <span style={{ color: 'var(--yellow)' }}>Order.</span></div>
         </div>
 
+        {/* Status tracker */}
         <div className="tracker">
           <div className="tracker-head">
             <div>
@@ -94,8 +123,18 @@ export default function OrderStatusPage() {
               <div className="tr-item">{order.item_description.slice(0, 50)}</div>
               {agentInfo?.name && (
                 <div className="type-label" style={{ marginTop: '0.4rem' }}>
-                  Dasher: {agentInfo.name} ★ {agentInfo.rating?.toFixed(1)}
+                  Dasher: {agentInfo.name} — {agentInfo.rating?.toFixed(1)} rating
                 </div>
+              )}
+              {/* Call Dasher button — visible once order is assigned */}
+              {agentInfo?.phone && order.status !== 'pending' && order.status !== 'cancelled' && (
+                <a
+                  href={`tel:${agentInfo.phone}`}
+                  className="btn btn-sm btn-primary"
+                  style={{ marginTop: '0.5rem', fontSize: '0.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                >
+                  📞 Call Dasher
+                </a>
               )}
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -103,10 +142,10 @@ export default function OrderStatusPage() {
                 {order.status.replace('_', ' ').toUpperCase()}
               </span>
               <div className="type-label" style={{ marginTop: '0.4rem' }}>
-                ₹{order.commission_amount} commission
+                Commission: ₹{order.commission_amount}
               </div>
               <div className="type-label">
-                {order.payment_method === 'agent_float' ? '💳 Agent Float' : '📱 UPI On Delivery'}
+                {order.payment_method === 'agent_float' ? 'Dasher Float' : 'UPI On Delivery'}
               </div>
             </div>
           </div>
@@ -116,13 +155,12 @@ export default function OrderStatusPage() {
               {ORDER_STATUS_STEPS.map((step, i) => {
                 const isDone = i < currentStepIdx || order.status === 'delivered';
                 const isActive = i === currentStepIdx && order.status !== 'cancelled';
-
                 return (
-                  <>
+                  <div key={step.key} style={{ display: 'contents' }}>
                     {i > 0 && (
-                      <div key={`line-${i}`} className={`status-line ${i <= currentStepIdx ? 'done' : ''}`} />
+                      <div className={`status-line ${i <= currentStepIdx ? 'done' : ''}`} />
                     )}
-                    <div className="status-step" key={step.key}>
+                    <div className="status-step">
                       <div className={`status-dot ${isDone ? 'done' : isActive ? 'active' : ''}`}>
                         {isDone ? '✓' : step.icon}
                       </div>
@@ -130,30 +168,32 @@ export default function OrderStatusPage() {
                         {step.label}
                       </div>
                     </div>
-                  </>
+                  </div>
                 );
               })}
             </div>
           </div>
         </div>
 
-        {/* UPI QR when picked_up and upi_on_delivery */}
-        {order.status === 'picked_up' && order.payment_method === 'upi_on_delivery' && (
+        {/* UPI section — feature-flagged */}
+        {FEATURES.UPI_PAYMENTS && order.status === 'picked_up' && order.payment_method === 'upi_on_delivery' && (
           <div style={{ marginTop: '2rem', background: 'var(--surf)', border: '0.2rem solid var(--yellow)', padding: '2rem', boxShadow: 'var(--sh-y)', textAlign: 'center' }}>
-            <div className="sec-label" style={{ justifyContent: 'center', display: 'flex' }}>📱 UPI Payment</div>
+            <div className="sec-label" style={{ justifyContent: 'center', display: 'flex' }}>UPI Payment</div>
             <div className="type-h1" style={{ margin: '1rem 0' }}>Pay ₹{order.order_value}</div>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-              <div style={{ padding: '1rem', background: 'white', border: '0.2rem solid var(--ink)', boxShadow: 'var(--sh)' }}>
-                <QRCode value={upiPaymentString} size={180} />
-              </div>
-            </div>
-            <div className="type-label" style={{ color: 'var(--yellow)' }}>Scan to pay before Dasher marks delivered</div>
-            <div className="type-label" style={{ marginTop: '0.5rem' }}>{DASHR_UPI_ID}</div>
+            <div className="type-label" style={{ color: 'var(--yellow)' }}>Pay via UPI when Dasher arrives</div>
+            <div className="type-label" style={{ marginTop: '0.5rem' }}>{UPI_ID}</div>
           </div>
         )}
 
-        {/* Order details */}
-        <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 20rem), 1fr))', gap: '1rem' }}>
+        {/* Payment info for customer */}
+        {order.status !== 'cancelled' && order.status !== 'delivered' && order.payment_method === 'agent_float' && order.status !== 'pending' && (
+          <div className="notice notice-g" style={{ marginTop: '1.5rem' }}>
+            Your Dasher has paid upfront for your order. Pay ₹{order.order_value + order.commission_amount} to the Dasher on delivery.
+          </div>
+        )}
+
+        {/* Details grid */}
+        <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 16rem), 1fr))', gap: '1rem' }}>
           <div className="stat-card">
             <div className="sc-lbl">Pickup</div>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '0.85rem', color: 'var(--white)', marginTop: '0.4rem' }}>
@@ -173,18 +213,55 @@ export default function OrderStatusPage() {
           </div>
         </div>
 
-        {order.status === 'cancelled' && (
-          <div className="notice notice-r" style={{ marginTop: '2rem' }}>
-            This order was cancelled. <a href="/order" style={{ color: 'var(--yellow)' }}>Place a new order →</a>
+        {/* Cancel */}
+        {order.status === 'pending' && (
+          <div style={{ marginTop: '2rem' }}>
+            {cancelError && <div className="notice notice-r" style={{ marginBottom: '1rem' }}>{cancelError}</div>}
+            <button className="btn btn-danger btn-block" onClick={cancelOrder} disabled={cancelling}>
+              {cancelling ? <span className="spinner" /> : 'Cancel Order'}
+            </button>
           </div>
         )}
 
+        {order.status === 'cancelled' && <div className="notice notice-r" style={{ marginTop: '2rem' }}>This order was cancelled.</div>}
+        
         {order.status === 'delivered' && (
           <div className="notice notice-g" style={{ marginTop: '2rem' }}>
-            ✓ Your order has been delivered! Enjoy 🎉
+            Delivered successfully! {!hasRated && 'Rate your Dasher below.'}
+          </div>
+        )}
+
+        {/* Rating prompt for delivered orders */}
+        {order.status === 'delivered' && user && user.id === order.customer_id && agentInfo && !hasRated && (
+          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+            <button
+              className="btn btn-primary btn-lg"
+              onClick={() => setShowRating(true)}
+            >
+              ★ Rate Your Dasher
+            </button>
+          </div>
+        )}
+
+        {isTerminal && (
+          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <Link href="/order" className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}>New Order</Link>
+            <Link href="/orders" className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }}>Order History</Link>
           </div>
         )}
       </div>
+
+      {/* Rating modal */}
+      {showRating && user && agentInfo && (
+        <RatingModal
+          orderId={order.id}
+          raterId={user.id}
+          ratedName={agentInfo.name || 'Your Dasher'}
+          raterRole="customer"
+          onClose={() => setShowRating(false)}
+          onSubmitted={() => setHasRated(true)}
+        />
+      )}
     </>
   );
 }

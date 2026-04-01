@@ -1,0 +1,117 @@
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * DASHR — Centralized Configuration
+ * ═══════════════════════════════════════════════════════════════
+ * Single source of truth for all app configuration.
+ * Feature flags, tunables, and environment validation.
+ *
+ * To add a new feature:
+ *   1. Add a flag in FEATURES
+ *   2. Add any related config in the relevant section
+ *   3. Use `config.features.yourFlag` in code
+ */
+
+// ── FEATURE FLAGS ─────────────────────────────────────────────
+// Toggle features on/off without touching code
+export const FEATURES = {
+  /** UPI QR payment on order status page */
+  UPI_PAYMENTS: false,
+  /** OCR-based ID card verification */
+  OCR_VERIFICATION: true,
+  /** Realtime order updates via Supabase channels */
+  REALTIME_ORDERS: true,
+  /** Agent priority queue for high-rated dashers */
+  PRIORITY_QUEUE: true,
+  /** Email OTP authentication */
+  EMAIL_OTP: true,
+} as const;
+
+// ── COMMISSION FLOORS ─────────────────────────────────────────
+export const COMMISSION_FLOORS = {
+  on_campus: 20,
+  shiv_temple: 30,
+  off_campus: 40,
+} as const;
+
+// ── PAYMENT ───────────────────────────────────────────────────
+/** Orders below this → agent_float; at or above → upi_on_delivery */
+export const AGENT_FLOAT_THRESHOLD = 200;
+
+/** UPI ID for payment collection (set when FEATURES.UPI_PAYMENTS = true) */
+export const UPI_ID = process.env.NEXT_PUBLIC_UPI_ID || 'dashr@upi';
+
+// ── STRIKE SYSTEM ─────────────────────────────────────────────
+export const STRIKES_TO_OFFBOARD = 3;
+
+// ── ZONE CONFIG ───────────────────────────────────────────────
+export const ZONE_LABELS = {
+  on_campus: 'On Campus',
+  shiv_temple: 'Shiv Temple',
+  off_campus: 'Off Campus',
+} as const;
+
+export const OFF_CAMPUS_LOCATIONS = ['Aborde', 'Potheri', 'Maraimalai Nagar'];
+
+// ── ORDER STATUS ──────────────────────────────────────────────
+export const ORDER_STATUS_STEPS = [
+  { key: 'pending',   label: 'Placed',         icon: '01' },
+  { key: 'assigned',  label: 'Dasher Assigned', icon: '02' },
+  { key: 'picked_up', label: 'Picked Up',       icon: '03' },
+  { key: 'delivered', label: 'At Your Door',     icon: '04' },
+] as const;
+
+// ── SRM HOSTELS ───────────────────────────────────────────────
+export const SRM_HOSTELS = [
+  'Himalaya Block', 'Kaveri Block', 'Ganga Block', 'Yamuna Block',
+  'Godavari Block', 'Sindhu Block', 'Krishna Block', 'Tungabhadra Block',
+  'Narmada Block', 'Brahmaputra Block', 'Mahanadi Block', 'Alaknanda Block',
+] as const;
+
+// ── OTP CONFIG ────────────────────────────────────────────────
+export const OTP_CONFIG = {
+  /** Length of the OTP code */
+  length: 6,
+  /** Time in minutes before OTP expires */
+  expiryMinutes: 10,
+  /** Maximum OTP send attempts per email in a 10-min window */
+  maxAttemptsPerWindow: 3,
+  /** Cooldown between OTP sends to same email (seconds) */
+  cooldownSeconds: 60,
+} as const;
+
+// ── EMAIL CONFIG ──────────────────────────────────────────────
+export const EMAIL_CONFIG = {
+  from: {
+    name: 'DASHR',
+    address: process.env.GMAIL_USER || '',
+  },
+} as const;
+
+// ── DERIVED TYPES ─────────────────────────────────────────────
+export type Zone = keyof typeof COMMISSION_FLOORS;
+export type OrderStatus = 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled';
+export type PaymentMethod = 'agent_float' | 'upi_on_delivery';
+export type UserRole = 'customer' | 'agent' | 'admin';
+export type LedgerType = 'commission' | 'reimbursement';
+
+// ── ENVIRONMENT VALIDATION ────────────────────────────────────
+// Call this at app startup to catch missing env vars early
+export function validateEnv(): string[] {
+  const errors: string[] = [];
+  const required = [
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'SUPABASE_SERVICE_ROLE_KEY',
+  ];
+
+  if (FEATURES.EMAIL_OTP) {
+    required.push('GMAIL_USER', 'GMAIL_APP_PASSWORD');
+  }
+
+  for (const key of required) {
+    if (!process.env[key]) {
+      errors.push(`Missing required env var: ${key}`);
+    }
+  }
+  return errors;
+}

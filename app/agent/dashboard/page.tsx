@@ -2,30 +2,18 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
-import { ZONE_LABELS } from '@/lib/constants';
 import OrderCard from '@/components/OrderCard';
+import AgentShell from '@/components/AgentShell';
 import type { Order, User } from '@/types';
-import type { Zone } from '@/lib/constants';
-
-function getWeekStart() {
-  const d = new Date();
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const monday = new Date(d.setDate(diff));
-  return monday.toISOString().split('T')[0];
-}
 
 export default function AgentDashboard() {
-  const router = useRouter();
   const supabase = createClient();
 
   const [agent, setAgent] = useState<User | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [weeklyUnpaid, setWeeklyUnpaid] = useState(0);
   const [accepting, setAccepting] = useState<string | null>(null);
+  const [acceptError, setAcceptError] = useState('');
   const [loading, setLoading] = useState(true);
 
   const loadOrders = useCallback(async () => {
@@ -40,27 +28,17 @@ export default function AgentDashboard() {
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
+      if (!user) return;
 
       const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
-      if (!profile || profile.role !== 'agent') { router.push('/order'); return; }
+      if (!profile || profile.role !== 'agent') return;
       setAgent(profile as User);
 
       await loadOrders();
-
-      // Weekly unpaid sum
-      const { data: ledger } = await supabase
-        .from('ledger')
-        .select('amount')
-        .eq('agent_id', user.id)
-        .eq('is_paid', false);
-      setWeeklyUnpaid((ledger || []).reduce((sum: number, e: {amount: number}) => sum + e.amount, 0));
-
       setLoading(false);
     }
     init();
 
-    // Realtime subscription for new orders
     const channel = supabase
       .channel('pending-orders')
       .on('postgres_changes', {
@@ -74,125 +52,91 @@ export default function AgentDashboard() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  async function toggleOnline() {
-    if (!agent) return;
-    const newState = !agent.is_online;
-    await supabase.from('users').update({ is_online: newState }).eq('id', agent.id);
-    setAgent({ ...agent, is_online: newState });
-    if (newState) await loadOrders();
-  }
-
   async function acceptOrder(orderId: string) {
     if (!agent) return;
     setAccepting(orderId);
-    await supabase.from('orders').update({
-      agent_id: agent.id,
-      status: 'assigned',
-    }).eq('id', orderId).eq('status', 'pending');
-    setOrders((prev) => prev.filter((o) => o.id !== orderId));
-    setAccepting(null);
-    router.push('/agent/active');
-  }
+    setAcceptError('');
 
-  const stars = Array.from({ length: 5 }, (_, i) => i < Math.round(agent?.rating || 5));
+    try {
+      const res = await fetch('/api/orders/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, agentId: agent.id }),
+      });
+      const data = await res.json();
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span className="spinner" style={{ width: '2.5rem', height: '2.5rem' }} />
-      </div>
-    );
+      if (!data.ok) {
+        setAcceptError(data.error || 'Failed to accept order');
+        setAccepting(null);
+        return;
+      }
+
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      setAccepting(null);
+      window.location.href = '/agent/active';
+    } catch {
+      setAcceptError('Network error. Try again.');
+      setAccepting(null);
+    }
   }
 
   return (
-    <div>
-      <nav className="nav">
-        <span className="nav-logo">DASHR<sup>SRM</sup></span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--mono)', fontSize: '0.7rem', color: 'var(--muted)' }}>
-          <span style={{ color: agent?.is_online ? 'var(--green)' : 'var(--muted)' }}>
-            {agent?.is_online ? '● ONLINE' : '○ OFFLINE'}
-          </span>
-        </div>
-      </nav>
-
-      <div className="dash-wrap" style={{ margin: '0' }}>
-        {/* Sidebar */}
-        <aside className="sidebar">
-          <div className="sb-head">
-            <div className="sb-agent-name">{agent?.name?.split(' ')[0] || 'Dasher'}</div>
-            <div className="sb-agent-meta">
-              {agent?.srm_id || 'SRM ID'} · ★ {agent?.rating?.toFixed(1)}
+    <AgentShell>
+      <div className="dash-topbar">
+        <div className="dash-title">Live Feed</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
+          {agent?.is_online && (
+            <div className="live-dot-wrap">
+              <div className="live-dot" />
+              {orders.length} order{orders.length !== 1 ? 's' : ''} available
             </div>
-            <div
-              className="sb-toggle toggle-row"
-              onClick={toggleOnline}
-              style={{ cursor: 'pointer' }}
-            >
-              <div className={`toggle-track ${agent?.is_online ? 'on' : ''}`}>
-                <div className="toggle-thumb" />
-              </div>
-              <span className="toggle-lbl" style={{ color: agent?.is_online ? 'var(--green)' : 'var(--muted)', fontSize: '0.65rem' }}>
-                {agent?.is_online ? 'ONLINE' : 'OFFLINE'}
-              </span>
-            </div>
-          </div>
-
-          <nav className="sb-nav">
-            <Link href="/agent/dashboard" className="active">⬡ &nbsp;Live Feed</Link>
-            <Link href="/agent/active">◈ &nbsp;Active Delivery</Link>
-            <Link href="/agent/ledger">≡ &nbsp;My Ledger</Link>
-          </nav>
-
-          <div className="sb-earnings">
-            <div className="sb-earn-lbl">Unpaid This Week</div>
-            <div className="sb-earn-val">₹{weeklyUnpaid}</div>
-            <div className="sb-earn-wk">Week: {getWeekStart()}</div>
-          </div>
-        </aside>
-
-        {/* Main feed */}
-        <div className="dash-main">
-          <div className="dash-topbar">
-            <div className="dash-title">Live Feed</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.2rem' }}>
-              {agent?.is_online && (
-                <div className="live-dot-wrap">
-                  <div className="live-dot" />
-                  {orders.length} order{orders.length !== 1 ? 's' : ''} available
-                </div>
-              )}
-              {(agent?.rating || 0) >= 4.5 && (
-                <span className="badge badge-yf">Priority Queue</span>
-              )}
-            </div>
-          </div>
-
-          <div className="dash-feed">
-            {!agent?.is_online ? (
-              <div style={{ padding: '3rem', textAlign: 'center' }}>
-                <div className="type-h2" style={{ marginBottom: '1rem' }}>You are offline</div>
-                <div className="type-label" style={{ marginBottom: '1.5rem' }}>Toggle online to see and accept orders</div>
-                <button className="btn btn-dark btn-lg" onClick={toggleOnline}>Go Online →</button>
-              </div>
-            ) : orders.length === 0 ? (
-              <div style={{ padding: '3rem', textAlign: 'center' }}>
-                <div className="type-h2" style={{ marginBottom: '0.5rem' }}>No pending orders</div>
-                <div className="type-label">New orders will appear here in real time</div>
-              </div>
-            ) : (
-              orders.map((order) => (
-                <div key={order.id} style={{ opacity: accepting === order.id ? 0.5 : 1 }}>
-                  <OrderCard
-                    order={order}
-                    onAccept={acceptOrder}
-                    showActions={!accepting}
-                  />
-                </div>
-              ))
-            )}
-          </div>
+          )}
+          {(agent?.rating || 0) >= 4.5 && (
+            <span className="badge badge-yf">Priority Queue</span>
+          )}
         </div>
       </div>
-    </div>
+
+      {/* Verification guard */}
+      {agent && !agent.is_verified && (
+        <div className="notice notice-y" style={{ margin: '1rem' }}>
+          Your account is pending verification. You cannot accept deliveries until an admin approves your ID card.
+        </div>
+      )}
+
+      {acceptError && (
+        <div className="notice notice-r" style={{ margin: '1rem' }}>
+          {acceptError}
+        </div>
+      )}
+
+      <div className="dash-feed">
+        {loading ? (
+          <div style={{ padding: '3rem', textAlign: 'center' }}>
+            <span className="spinner" style={{ width: '2rem', height: '2rem' }} />
+          </div>
+        ) : !agent?.is_online ? (
+          <div style={{ padding: '3rem', textAlign: 'center' }}>
+            <div className="type-h2" style={{ marginBottom: '1rem' }}>You are offline</div>
+            <div className="type-label" style={{ marginBottom: '1.5rem' }}>Toggle online to see and accept orders</div>
+          </div>
+        ) : orders.length === 0 ? (
+          <div style={{ padding: '3rem', textAlign: 'center' }}>
+            <div className="type-h2" style={{ marginBottom: '0.5rem' }}>No pending orders</div>
+            <div className="type-label">New orders will appear here in real time</div>
+          </div>
+        ) : (
+          orders.map((order) => (
+            <div key={order.id} style={{ opacity: accepting === order.id ? 0.5 : 1 }}>
+              <OrderCard
+                order={order}
+                onAccept={agent?.is_verified ? acceptOrder : undefined}
+                showActions={!accepting && !!agent?.is_verified}
+              />
+            </div>
+          ))
+        )}
+      </div>
+    </AgentShell>
   );
 }

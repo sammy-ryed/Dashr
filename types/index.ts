@@ -1,4 +1,4 @@
-import type { Zone, OrderStatus, PaymentMethod, UserRole, LedgerType } from '@/lib/constants';
+import type { Zone, OrderStatus, PaymentMethod, UserRole, LedgerType } from '@/lib/config';
 
 export interface User {
   id: string;
@@ -6,7 +6,8 @@ export interface User {
   phone: string | null;
   email: string | null;
   role: UserRole;
-  srm_id: string | null;
+  srm_id?: string;
+  id_card_url?: string;
   is_verified: boolean;
   rating: number;
   total_deliveries: number;

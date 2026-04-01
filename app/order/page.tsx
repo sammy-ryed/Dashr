@@ -4,16 +4,10 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
-import { COMMISSION_FLOORS, AGENT_FLOAT_THRESHOLD, ZONE_LABELS } from '@/lib/constants';
+import { COMMISSION_FLOORS, AGENT_FLOAT_THRESHOLD, ZONE_LABELS, SRM_HOSTELS } from '@/lib/config';
 import Nav from '@/components/Nav';
 import MarqueeBar from '@/components/MarqueeBar';
-import type { Zone } from '@/lib/constants';
-
-const SRM_HOSTELS = [
-  'Himalaya Block', 'Kaveri Block', 'Ganga Block', 'Yamuna Block',
-  'Godavari Block', 'Sindhu Block', 'Krishna Block', 'Tungabhadra Block',
-  'Narmada Block', 'Brahmaputra Block', 'Mahanadi Block', 'Alaknanda Block',
-];
+import type { Zone } from '@/lib/config';
 
 export default function OrderPage() {
   const router = useRouter();
@@ -21,6 +15,7 @@ export default function OrderPage() {
 
   const [user, setUser] = useState<{ id: string; name: string; role: string } | null>(null);
   const [onlineCount, setOnlineCount] = useState(0);
+  const [authLoading, setAuthLoading] = useState(true);
 
   const [itemDescription, setItemDescription] = useState('');
   const [pickupLocation, setPickupLocation] = useState('');
@@ -46,6 +41,7 @@ export default function OrderPage() {
       }
       const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'agent').eq('is_online', true);
       setOnlineCount(count || 0);
+      setAuthLoading(false);
     }
     init();
   }, []);
@@ -62,7 +58,7 @@ export default function OrderPage() {
     if (!hostel) { setError('Select your hostel'); return; }
     if (!room.trim()) { setError('Enter your room number'); return; }
     if (!orderValue || Number(orderValue) <= 0) { setError('Enter order value'); return; }
-    if (commission < minComm) { setError(`Minimum commission for ${ZONE_LABELS[zone]} is ₹${minComm}`); return; }
+    if (commission < minComm) { setError(`Minimum commission for ${ZONE_LABELS[zone]} is ${minComm}`); return; }
 
     setLoading(true);
     setError('');
@@ -83,22 +79,22 @@ export default function OrderPage() {
 
     const { data, error: insertError } = await supabase.from('orders').insert(payload).select('id').single();
     if (insertError) { setError(insertError.message); setLoading(false); return; }
-
     router.push(`/order/${data.id}/status`);
   }
 
   return (
     <>
-      <Nav role={user?.role as 'customer'} userName={user?.name} />
+      <Nav role={user?.role as 'customer'} userName={user?.name} isLoading={authLoading} />
       <MarqueeBar />
 
-      <div style={{ minHeight: '90vh', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '3rem clamp(1rem,5vw,4rem)' }}>
+      <div className="page-enter" style={{ minHeight: '85vh', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem clamp(1rem,5vw,4rem)' }}>
         <div className="page-mock" style={{ width: '100%', maxWidth: '36rem' }}>
+
           {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.8rem' }}>
-            <div className="nav-logo" style={{ fontSize: '1.4rem', padding: 0 }}>DASHR<sup style={{ fontFamily: 'var(--mono)', fontSize: '0.5rem', background: 'var(--yellow)', color: 'var(--ink)', padding: '0.1em 0.4em', border: '0.12rem solid var(--ink)', verticalAlign: 'super', marginLeft: '0.2rem' }}>SRM</sup></div>
-            <span className={`badge ${onlineCount > 0 ? 'badge-gf' : 'badge-r'}`}>
-              {onlineCount > 0 ? `● ${onlineCount} Dashers Online` : '⊘ No Dashers Online'}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div className="sec-label" style={{ marginBottom: 0 }}>New Order</div>
+            <span className={`badge ${onlineCount > 0 ? 'badge-g' : 'badge-r'}`}>
+              {onlineCount > 0 ? `${onlineCount} Online` : 'No Dashers'}
             </span>
           </div>
 
@@ -106,11 +102,13 @@ export default function OrderPage() {
 
           {error && <div className="notice notice-r" style={{ marginBottom: '1.5rem' }}>{error}</div>}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            {/* Item description */}
-            <div className="inp-wrap" data-label="What do you want?">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+            {/* Item */}
+            <div className="inp-wrap" data-label="What do you need?">
               <textarea
                 className="inp"
+                id="order-item"
                 placeholder="2x Maggi, 1 Red Bull from A-Block canteen..."
                 rows={2}
                 style={{ resize: 'none' }}
@@ -119,94 +117,63 @@ export default function OrderPage() {
               />
             </div>
 
-            {/* Zone selector */}
+            {/* Zone */}
             <div>
-              <div className="type-label" style={{ marginBottom: '0.7rem' }}>Pickup Zone</div>
+              <div className="type-label" style={{ marginBottom: '0.6rem' }}>Pickup Zone</div>
               <div className="zone-grid">
                 {(Object.keys(ZONE_LABELS) as Zone[]).map((z) => (
-                  <button
-                    key={z}
-                    className={`zone-btn ${zone === z ? 'active' : ''}`}
-                    onClick={() => handleZone(z)}
-                  >
+                  <button key={z} className={`zone-btn ${zone === z ? 'active' : ''}`} onClick={() => handleZone(z)}>
                     {ZONE_LABELS[z]}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Pickup location */}
+            {/* Pickup */}
             <div className="inp-wrap" data-label="Pickup Location">
-              <input
-                className="inp"
-                type="text"
-                placeholder="Nilgiri canteen, stall 3..."
-                value={pickupLocation}
-                onChange={(e) => setPickupLocation(e.target.value)}
-              />
+              <input className="inp" id="order-pickup" type="text" placeholder="Nilgiri canteen, stall 3..." value={pickupLocation} onChange={(e) => setPickupLocation(e.target.value)} />
             </div>
 
             {/* Hostel + Room */}
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.8rem' }}>
-              <div className="inp-wrap" data-label="Your Hostel Block">
-                <select className="inp" value={hostel} onChange={(e) => setHostel(e.target.value)}>
+            <div className="order-grid-2">
+              <div className="inp-wrap" data-label="Hostel Block">
+                <select className="inp" id="order-hostel" value={hostel} onChange={(e) => setHostel(e.target.value)}>
                   <option value="">Select...</option>
                   {SRM_HOSTELS.map((h) => <option key={h} value={h}>{h}</option>)}
                 </select>
               </div>
               <div className="inp-wrap" data-label="Room No.">
-                <input className="inp" type="text" placeholder="204" value={room} onChange={(e) => setRoom(e.target.value)} />
+                <input className="inp" id="order-room" type="text" placeholder="204" value={room} onChange={(e) => setRoom(e.target.value)} />
               </div>
             </div>
 
-            {/* Order value */}
-            <div className="inp-wrap" data-label="Order Value (₹)">
-              <input
-                className="inp"
-                type="number"
-                placeholder="0"
-                min="1"
-                value={orderValue}
-                onChange={(e) => setOrderValue(e.target.value)}
-              />
+            {/* Value */}
+            <div className="inp-wrap" data-label="Order Value (INR)">
+              <input className="inp" id="order-value" type="number" placeholder="0" min="1" value={orderValue} onChange={(e) => setOrderValue(e.target.value)} />
               <span style={{
-                fontFamily: 'var(--mono)', fontSize: '0.62rem', whiteSpace: 'nowrap', letterSpacing: '0.04em',
+                fontFamily: 'var(--mono)', fontSize: '0.6rem', whiteSpace: 'nowrap', letterSpacing: '0.04em',
                 color: isAgentFloat ? 'var(--green)' : 'var(--orange)',
+                textTransform: 'uppercase',
               }}>
-                {isAgentFloat ? 'Agent float' : 'UPI on delivery'}
+                {isAgentFloat ? 'Dasher float' : 'UPI on delivery'}
               </span>
-            </div>
-
-            {/* Payment method explanation */}
-            <div className="notice notice-y" style={{ fontSize: '0.65rem' }}>
-              {isAgentFloat
-                ? `₹${AGENT_FLOAT_THRESHOLD} threshold: Dasher pays upfront, reimbursed weekly. Order is under ₹${AGENT_FLOAT_THRESHOLD}.`
-                : `Order is ₹${AGENT_FLOAT_THRESHOLD}+: You pay via UPI when Dasher arrives at your door.`}
             </div>
 
             {/* Commission */}
             <div className="comm-wrap">
               <div className="comm-row">
-                <span className="comm-prefix">₹</span>
-                <input
-                  className="comm-num"
-                  type="number"
-                  min={minComm}
-                  value={commission}
-                  onChange={(e) => setCommission(Math.max(minComm, Number(e.target.value)))}
-                />
+                <span className="comm-prefix">INR</span>
+                <input className="comm-num" id="order-commission" type="number" min={minComm} value={commission} onChange={(e) => setCommission(Math.max(minComm, Number(e.target.value)))} />
               </div>
-              <div className="comm-hint">MIN ₹{minComm} for {ZONE_LABELS[zone]} orders</div>
+              <div className="comm-hint">MIN {minComm} for {ZONE_LABELS[zone]} orders · Higher commission = faster pickup</div>
             </div>
 
-            <button className="btn btn-primary btn-lg btn-block" onClick={placeOrder} disabled={loading || !user}>
-              {loading ? <span className="spinner" /> : 'Post Order →'}
+            <button className="btn btn-primary btn-lg btn-block" id="order-submit" onClick={placeOrder} disabled={loading || !user}>
+              {loading ? <span className="spinner" /> : 'Post Order'}
             </button>
 
             {!user && (
-              <div className="login-foot">
-                <a href="/login">Login to place an order →</a>
-              </div>
+              <div className="login-foot"><a href="/login">Login to place an order</a></div>
             )}
           </div>
         </div>
