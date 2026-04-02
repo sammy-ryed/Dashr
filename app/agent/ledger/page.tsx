@@ -27,7 +27,7 @@ export default function AgentLedgerPage() {
 
       const { data: entries } = await supabase
         .from('ledger')
-        .select('*, order:order_id(id, pickup_zone, payment_method)')
+        .select('*, order:order_id(id, pickup_zone, payment_method, order_value)')
         .eq('agent_id', user.id)
         .order('week_start', { ascending: false })
         .order('created_at', { ascending: false });
@@ -85,7 +85,8 @@ export default function AgentLedgerPage() {
                   <th>Order ID</th>
                   <th>Type</th>
                   <th>Zone</th>
-                  <th>Amount</th>
+                  <th>Product Price</th>
+                  <th>Commission</th>
                   <th>Week</th>
                   <th>Status</th>
                 </tr>
@@ -93,18 +94,19 @@ export default function AgentLedgerPage() {
               {ledger.map((week) => (
                 <tbody key={`week-${week.weekStart}`}>
                   <tr className="wk-row">
-                    <td colSpan={6}>── Week of {format(parseISO(week.weekStart), 'd MMM yyyy')} · Total: ₹{week.total} ──</td>
+                    <td colSpan={7}>── Week of {format(parseISO(week.weekStart), 'd MMM yyyy')} · Total: ₹{week.total} ──</td>
                   </tr>
                   {week.entries.map((entry) => {
                     const order = entry.order as any;
                     return (
                       <tr key={entry.id}>
-                        <td><span className="type-mono" style={{ fontSize: '0.65rem' }}>#{(entry.order_id || '').slice(-4).toUpperCase()}</span></td>
-                        <td><span className={`badge ${entry.type === 'commission' ? 'badge-y' : 'badge-w'}`}>{entry.type}</span></td>
-                        <td>{order?.pickup_zone?.replace('_', ' ') || '—'}</td>
-                        <td className="amt">₹{entry.amount}</td>
-                        <td>{format(parseISO(week.weekStart), 'MMM d')}</td>
-                        <td>
+                        <td data-label="Order ID"><span className="type-mono" style={{ fontSize: '0.65rem' }}>#{(entry.order_id || '').slice(-4).toUpperCase()}</span></td>
+                        <td data-label="Type"><span className={`badge ${entry.type === 'commission' ? 'badge-y' : 'badge-w'}`}>{entry.type}</span></td>
+                        <td data-label="Zone">{order?.pickup_zone?.replace('_', ' ') || '—'}</td>
+                        <td data-label="Product Price" className="amt">₹{order?.order_value || '—'}</td>
+                        <td data-label="Commission" className="amt">₹{entry.amount}</td>
+                        <td data-label="Week">{format(parseISO(week.weekStart), 'MMM d')}</td>
+                        <td data-label="Status">
                           <span className="badge badge-gf">✓ Recorded</span>
                         </td>
                       </tr>

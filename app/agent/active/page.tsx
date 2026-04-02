@@ -138,7 +138,7 @@ export default function AgentActivePage() {
                   <div className="type-label" style={{ marginTop: '0.3rem' }}>Your commission</div>
                 </div>
                 <span className={order.payment_method === 'agent_float' ? 'badge badge-w' : 'badge badge-r'}>
-                  {order.payment_method === 'agent_float' ? 'Dasher Float' : 'UPI On Delivery'}
+                  {order.payment_method === 'agent_float' ? `₹${order.order_value} Prepaid` : `Pay ₹${order.order_value} on Delivery`}
                 </span>
               </div>
             </div>

@@ -47,7 +47,7 @@ export interface LedgerEntry {
   week_start: string;
   is_paid: boolean;
   created_at: string;
-  order?: Pick<Order, 'id' | 'pickup_zone' | 'payment_method'>;
+  order?: Pick<Order, 'id' | 'pickup_zone' | 'payment_method' | 'order_value'>;
 }
 
 export interface Strike {

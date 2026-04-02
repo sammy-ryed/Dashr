@@ -8,6 +8,7 @@ import type { User } from '@/types';
 
 interface AgentShellProps {
   children: React.ReactNode;
+  forceCustomerMode?: boolean;
 }
 
 function getWeekStart() {
@@ -18,7 +19,7 @@ function getWeekStart() {
   return monday.toISOString().split('T')[0];
 }
 
-export default function AgentShell({ children }: AgentShellProps) {
+export default function AgentShell({ children, forceCustomerMode }: AgentShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -28,6 +29,7 @@ export default function AgentShell({ children }: AgentShellProps) {
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [customerMode, setCustomerMode] = useState(false);
 
   useEffect(() => {
     async function init() {
@@ -137,6 +139,11 @@ export default function AgentShell({ children }: AgentShellProps) {
     { href: '/agent/ledger', label: 'My Ledger', icon: '≡' },
   ];
 
+  const customerLinks = [
+    { href: '/order', label: 'Place Order', icon: '○' },
+    { href: '/orders', label: 'My Orders', icon: '□' },
+  ];
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -218,6 +225,34 @@ export default function AgentShell({ children }: AgentShellProps) {
                   {l.icon} &nbsp;{l.label}
                 </Link>
               ))}
+
+              {/* Customer Mode Toggle */}
+              <div style={{ padding: '0.6rem 1.4rem', borderTop: '0.12rem solid #2a2a2a', marginTop: '0.4rem' }}>
+                <div
+                  className="mobile-menu-link"
+                  style={{ padding: '0.5rem 0', cursor: 'pointer', borderLeft: 'none' }}
+                  onClick={() => setCustomerMode(!customerMode)}
+                >
+                  <span style={{ fontSize: '0.65rem', color: customerMode ? 'var(--green)' : 'var(--muted)' }}>
+                    {customerMode ? '✓ Customer Mode ON' : '○ Customer Mode'}
+                  </span>
+                </div>
+              </div>
+
+              {customerMode && (
+                <div style={{ borderTop: '0.12rem solid #2a2a2a' }}>
+                  {customerLinks.map((l) => (
+                    <Link
+                      key={l.href}
+                      href={l.href}
+                      className={`mobile-menu-link ${pathname === l.href ? 'active' : ''}`}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      {l.icon} &nbsp;{l.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
               <Link
                 href="/profile"
                 className={`mobile-menu-link ${pathname === '/profile' ? 'active' : ''}`}
@@ -273,6 +308,36 @@ export default function AgentShell({ children }: AgentShellProps) {
               </Link>
             ))}
           </nav>
+
+          {/* Customer Mode Toggle */}
+          <div style={{ padding: '0 1.3rem', borderTop: '0.14rem solid #2a2a2a', paddingTop: '0.8rem' }}>
+            <div
+              className="sb-toggle toggle-row"
+              onClick={() => setCustomerMode(!customerMode)}
+              style={{ cursor: 'pointer' }}
+            >
+              <div className={`toggle-track ${customerMode ? 'on' : ''}`}>
+                <div className="toggle-thumb" />
+              </div>
+              <span className="toggle-lbl" style={{ color: customerMode ? 'var(--green)' : 'var(--muted)', fontSize: '0.6rem' }}>
+                CUSTOMER MODE
+              </span>
+            </div>
+          </div>
+
+          {customerMode && (
+            <nav className="sb-nav" style={{ padding: '0.4rem 0', borderTop: '0.12rem solid #2a2a2a' }}>
+              {customerLinks.map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className={pathname === l.href || pathname.startsWith(l.href + '/') ? 'active' : ''}
+                >
+                  {l.icon} &nbsp;{l.label}
+                </Link>
+              ))}
+            </nav>
+          )}
 
           <div className="sb-earnings">
             <div className="sb-earn-lbl">Earned This Week</div>

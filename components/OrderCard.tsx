@@ -44,7 +44,7 @@ export default function OrderCard({ order, onAccept, onPickedUp, onDeliver, show
 
       <div className="oc-title">{order.item_description.slice(0, 60)}{order.item_description.length > 60 ? '…' : ''}</div>
       <div className="oc-meta">From: {order.pickup_location} — To: {order.delivery_hostel} {order.delivery_room}</div>
-      <div className="oc-meta">Value: {order.order_value}</div>
+      <div className="oc-meta">Product Price: ₹{order.order_value}</div>
 
       <div className="oc-foot">
         <div>
@@ -55,7 +55,7 @@ export default function OrderCard({ order, onAccept, onPickedUp, onDeliver, show
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
           <span className={order.payment_method === 'agent_float' ? 'badge badge-w' : 'badge badge-r'}>
-            {order.payment_method === 'agent_float' ? 'Dasher Float' : 'UPI On Delivery'}
+            {order.payment_method === 'agent_float' ? `₹${order.order_value} Prepaid` : `Pay ₹${order.order_value} on Delivery`}
           </span>
           {showActions && order.status === 'pending' && onAccept && (
             <button className="btn btn-primary btn-sm" onClick={() => onAccept(order.id)}>Accept</button>

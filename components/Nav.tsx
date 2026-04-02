@@ -7,13 +7,14 @@ import { createClient } from '@/lib/supabase';
 
 interface NavProps {
   role?: 'customer' | 'agent' | 'admin';
+  actualRole?: string;
   userName?: string;
   isOnline?: boolean;
   onToggleOnline?: () => void;
   isLoading?: boolean;
 }
 
-export default function Nav({ role, userName, isOnline, onToggleOnline, isLoading }: NavProps) {
+export default function Nav({ role, actualRole, userName, isOnline, onToggleOnline, isLoading }: NavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -63,6 +64,8 @@ export default function Nav({ role, userName, isOnline, onToggleOnline, isLoadin
     ];
   })();
 
+  const isAgentOnCustomerPage = actualRole === 'agent' && role !== 'agent';
+
   // First initial for the avatar
   const initial = userName ? userName.charAt(0).toUpperCase() : '?';
 
@@ -85,17 +88,24 @@ export default function Nav({ role, userName, isOnline, onToggleOnline, isLoadin
               </Link>
             </li>
           ))}
+          {isAgentOnCustomerPage && (
+            <li key="/agent/dashboard">
+              <Link href="/agent/dashboard" style={{ color: 'var(--yellow)' }}>
+                Back to Dasher
+              </Link>
+            </li>
+          )}
         </ul>
 
         <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
           {/* Agent online toggle */}
           {role === 'agent' && onToggleOnline && (
             <button
-              className="nav-cta"
+              className={`nav-online-btn ${isOnline ? 'is-online' : ''}`}
               onClick={onToggleOnline}
-              style={{ background: isOnline ? 'var(--green)' : 'var(--yellow)' }}
             >
-              {isOnline ? 'Online' : 'Go Online'}
+              <div className="status-dot-pulse" />
+              {isOnline ? 'On Duty' : 'Off Duty'}
             </button>
           )}
 
@@ -162,6 +172,18 @@ export default function Nav({ role, userName, isOnline, onToggleOnline, isLoadin
                   {l.label}
                 </Link>
               ))}
+              {isAgentOnCustomerPage && (
+                <div style={{ padding: '0.6rem 1.4rem', borderTop: '0.12rem solid #2a2a2a', marginTop: '0.4rem', marginBottom: '0.4rem' }}>
+                  <Link
+                    href="/agent/dashboard"
+                    className="mobile-menu-link"
+                    style={{ padding: '0.5rem 0', borderLeft: 'none', color: 'var(--yellow)' }}
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    ← Back to Dasher
+                  </Link>
+                </div>
+              )}
               {/* Profile link in menu */}
               {userName && (
                 <Link

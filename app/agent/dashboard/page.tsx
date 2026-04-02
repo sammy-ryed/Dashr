@@ -16,11 +16,12 @@ export default function AgentDashboard() {
   const [acceptError, setAcceptError] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (userId: string) => {
     const { data } = await supabase
       .from('orders')
       .select('*')
       .eq('status', 'pending')
+      .neq('customer_id', userId)
       .order('commission_amount', { ascending: false });
     setOrders((data as Order[]) || []);
   }, []);
@@ -34,7 +35,7 @@ export default function AgentDashboard() {
       if (!profile || profile.role !== 'agent') return;
       setAgent(profile as User);
 
-      await loadOrders();
+      await loadOrders(user.id);
       setLoading(false);
     }
     init();
@@ -46,7 +47,12 @@ export default function AgentDashboard() {
         schema: 'public',
         table: 'orders',
         filter: 'status=eq.pending',
-      }, loadOrders)
+      }, () => {
+        setAgent((curr) => {
+          if (curr?.id) loadOrders(curr.id);
+          return curr;
+        });
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };

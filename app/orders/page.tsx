@@ -69,7 +69,7 @@ export default function OrdersPage() {
 
   return (
     <>
-      <Nav role={user?.role as 'customer'} userName={user?.name} isLoading={loading} />
+      <Nav role={user?.role === 'admin' ? 'admin' : 'customer'} actualRole={user?.role} userName={user?.name} isLoading={loading} />
       <MarqueeBar />
 
       <div className="page-enter" style={{ padding: '2rem clamp(1rem,5vw,4rem)', maxWidth: '72rem', margin: '0 auto' }}>
@@ -137,7 +137,7 @@ export default function OrdersPage() {
                     {agentInfo?.name && <div className="oc-meta">Dasher: {agentInfo.name} — {agentInfo.rating?.toFixed(1)}</div>}
                     <div className="oc-foot">
                       <div>
-                        <div className="oc-comm">{order.order_value}</div>
+                        <div className="oc-comm">₹{order.order_value}</div>
                         <span className="badge badge-y" style={{ marginTop: '0.3rem', display: 'inline-block', fontSize: '0.5rem' }}>
                           {ZONE_LABELS[order.pickup_zone]}
                         </span>

@@ -23,7 +23,8 @@ export default function OrderPage() {
   const [hostel, setHostel] = useState('');
   const [room, setRoom] = useState('');
   const [orderValue, setOrderValue] = useState('');
-  const [commission, setCommission] = useState<number>(COMMISSION_FLOORS.on_campus);
+  const [commission, setCommission] = useState<string>(String(COMMISSION_FLOORS.on_campus));
+  const [commError, setCommError] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -49,7 +50,29 @@ export default function OrderPage() {
   function handleZone(z: Zone) {
     setZone(z);
     const floor = COMMISSION_FLOORS[z];
-    if (commission < floor) setCommission(floor);
+    const numComm = Number(commission) || 0;
+    if (numComm < floor) {
+      setCommission(String(floor));
+      setCommError('');
+    }
+  }
+
+  function handleCommissionBlur() {
+    const num = Number(commission) || 0;
+    if (num < minComm) {
+      setCommission(String(minComm));
+      setCommError(`Minimum is ₹${minComm} for ${ZONE_LABELS[zone]}`);
+      setTimeout(() => setCommError(''), 3000);
+    } else {
+      setCommError('');
+    }
+  }
+
+  function adjustCommission(delta: number) {
+    const current = Number(commission) || minComm;
+    const next = Math.max(minComm, current + delta);
+    setCommission(String(next));
+    setCommError('');
   }
 
   async function placeOrder() {
@@ -58,7 +81,9 @@ export default function OrderPage() {
     if (!hostel) { setError('Select your hostel'); return; }
     if (!room.trim()) { setError('Enter your room number'); return; }
     if (!orderValue || Number(orderValue) <= 0) { setError('Enter order value'); return; }
-    if (commission < minComm) { setError(`Minimum commission for ${ZONE_LABELS[zone]} is ${minComm}`); return; }
+    const commNum = Number(commission) || 0;
+    if (commNum < minComm) { setError(`Minimum commission for ${ZONE_LABELS[zone]} is ₹${minComm}`); return; }
+
 
     setLoading(true);
     setError('');
@@ -71,7 +96,7 @@ export default function OrderPage() {
       delivery_hostel: hostel,
       delivery_room: room.trim(),
       order_value: Number(orderValue),
-      commission_amount: commission,
+      commission_amount: Number(commission),
       min_commission: minComm,
       payment_method: isAgentFloat ? 'agent_float' : 'upi_on_delivery',
       status: 'pending',
@@ -84,7 +109,7 @@ export default function OrderPage() {
 
   return (
     <>
-      <Nav role={user?.role as 'customer'} userName={user?.name} isLoading={authLoading} />
+      <Nav role={user?.role === 'admin' ? 'admin' : 'customer'} actualRole={user?.role} userName={user?.name} isLoading={authLoading} />
       <MarqueeBar />
 
       <div className="page-enter" style={{ minHeight: '85vh', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem clamp(1rem,5vw,4rem)' }}>
@@ -155,17 +180,28 @@ export default function OrderPage() {
                 color: isAgentFloat ? 'var(--green)' : 'var(--orange)',
                 textTransform: 'uppercase',
               }}>
-                {isAgentFloat ? 'Dasher float' : 'UPI on delivery'}
+                {isAgentFloat ? `₹${orderValue || 0} · Dasher Prepaid` : `₹${orderValue || 0} · Pay on delivery`}
               </span>
             </div>
 
             {/* Commission */}
             <div className="comm-wrap">
               <div className="comm-row">
-                <span className="comm-prefix">INR</span>
-                <input className="comm-num" id="order-commission" type="number" min={minComm} value={commission} onChange={(e) => setCommission(Math.max(minComm, Number(e.target.value)))} />
+                <span className="comm-prefix">₹</span>
+                <button type="button" className="comm-step" onClick={() => adjustCommission(-5)} aria-label="Decrease">−</button>
+                <input
+                  className="comm-num"
+                  id="order-commission"
+                  type="number"
+                  inputMode="numeric"
+                  value={commission}
+                  onChange={(e) => setCommission(e.target.value)}
+                  onBlur={handleCommissionBlur}
+                />
+                <button type="button" className="comm-step" onClick={() => adjustCommission(5)} aria-label="Increase">+</button>
               </div>
-              <div className="comm-hint">MIN {minComm} for {ZONE_LABELS[zone]} orders · Higher commission = faster pickup</div>
+              {commError && <div className="comm-err">{commError}</div>}
+              <div className="comm-hint">MIN ₹{minComm} for {ZONE_LABELS[zone]} · Higher = faster pickup</div>
             </div>
 
             <button className="btn btn-primary btn-lg btn-block" id="order-submit" onClick={placeOrder} disabled={loading || !user}>

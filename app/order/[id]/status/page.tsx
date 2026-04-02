@@ -126,15 +126,27 @@ export default function OrderStatusPage() {
                   Dasher: {agentInfo.name} — {agentInfo.rating?.toFixed(1)} rating
                 </div>
               )}
-              {/* Call Dasher button — visible once order is assigned */}
+              {/* Dasher Contact Card */}
               {agentInfo?.phone && order.status !== 'pending' && order.status !== 'cancelled' && (
-                <a
-                  href={`tel:${agentInfo.phone}`}
-                  className="btn btn-sm btn-primary"
-                  style={{ marginTop: '0.5rem', fontSize: '0.6rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                >
-                  📞 Call Dasher
-                </a>
+                <div style={{
+                  marginTop: '0.8rem', padding: '0.7rem', background: 'var(--surf2)',
+                  border: '0.14rem solid var(--yellow)', display: 'flex', alignItems: 'center',
+                  gap: '0.8rem', flexWrap: 'wrap'
+                }}>
+                  <div style={{ flex: 1, minWidth: '8rem' }}>
+                    <div className="type-label" style={{ fontSize: '0.55rem', marginBottom: '0.2rem' }}>DASHER CONTACT</div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '0.85rem', color: 'var(--yellow)' }}>
+                      {agentInfo.name} · {agentInfo.phone}
+                    </div>
+                  </div>
+                  <a
+                    href={`tel:${agentInfo.phone}`}
+                    className="btn btn-sm btn-primary"
+                    style={{ fontSize: '0.6rem', whiteSpace: 'nowrap' }}
+                  >
+                    📞 Call Now
+                  </a>
+                </div>
               )}
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -145,7 +157,7 @@ export default function OrderStatusPage() {
                 Commission: ₹{order.commission_amount}
               </div>
               <div className="type-label">
-                {order.payment_method === 'agent_float' ? 'Dasher Float' : 'UPI On Delivery'}
+                {order.payment_method === 'agent_float' ? `₹${order.order_value} Prepaid` : `Pay ₹${order.order_value} on Delivery`}
               </div>
             </div>
           </div>
@@ -226,17 +238,20 @@ export default function OrderStatusPage() {
         {order.status === 'cancelled' && <div className="notice notice-r" style={{ marginTop: '2rem' }}>This order was cancelled.</div>}
         
         {order.status === 'delivered' && (
-          <div className="notice notice-g" style={{ marginTop: '2rem' }}>
+          <div className="notice notice-g" style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1.4rem' }}>✓</span>
             Delivered successfully! {!hasRated && 'Rate your Dasher below.'}
           </div>
         )}
 
         {/* Rating prompt for delivered orders */}
         {order.status === 'delivered' && user && user.id === order.customer_id && agentInfo && !hasRated && (
-          <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+          <div style={{ marginTop: '1.5rem', textAlign: 'center', animation: 'fadeInUp 0.5s ease' }}>
+            <div className="type-label" style={{ marginBottom: '0.8rem', color: 'var(--yellow)' }}>How was your delivery experience?</div>
             <button
               className="btn btn-primary btn-lg"
               onClick={() => setShowRating(true)}
+              style={{ animation: 'pulse-glow 2s ease-in-out infinite' }}
             >
               ★ Rate Your Dasher
             </button>
