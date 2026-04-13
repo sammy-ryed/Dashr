@@ -1,29 +1,16 @@
 /**
- * ═══════════════════════════════════════════════════════════════
- * DASHR — Email Transport (Gmail SMTP via Nodemailer)
- * ═══════════════════════════════════════════════════════════════
- * Reusable email helper. Swap transport for any provider later
- * by changing `createTransport(...)` config — zero consumer changes.
+ * DASHR — Email Transport (Brevo Transactional API)
+ * Centralized provider integration for OTP and high-value notifications.
  */
 
-import nodemailer from 'nodemailer';
 import { EMAIL_CONFIG, OTP_CONFIG } from '@/lib/config';
 
-// ── TRANSPORT (lazy singleton) ────────────────────────────────
-let _transport: nodemailer.Transporter | null = null;
+const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
+const BREVO_SENDERS_ENDPOINT = 'https://api.brevo.com/v3/senders';
 
-function getTransport(): nodemailer.Transporter {
-  if (!_transport) {
-    _transport = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
-      },
-    });
-  }
-  return _transport;
-}
+let senderValidationCache:
+  | { checkedAt: number; validSenders: Set<string> }
+  | null = null;
 
 // ── EMAIL TEMPLATES ───────────────────────────────────────────
 // Add new templates here as the app grows
@@ -55,26 +42,134 @@ function otpEmailHtml(code: string): string {
   `;
 }
 
+interface BrevoResponse {
+  messageId?: string;
+  code?: string;
+  message?: string;
+}
+
+interface BrevoSender {
+  email?: string;
+  active?: boolean;
+}
+
+async function hasActiveBrevoSender(apiKey: string, senderEmail: string) {
+  const now = Date.now();
+  if (senderValidationCache && now - senderValidationCache.checkedAt < 10 * 60 * 1000) {
+    return senderValidationCache.validSenders.has(senderEmail.toLowerCase());
+  }
+
+  const res = await fetch(BREVO_SENDERS_ENDPOINT, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'api-key': apiKey,
+    },
+  });
+
+  if (!res.ok) {
+    return true;
+  }
+
+  const payload = (await res.json()) as { senders?: BrevoSender[] };
+  const validSenders = new Set(
+    (payload.senders || [])
+      .filter((s) => s.active && s.email)
+      .map((s) => String(s.email).toLowerCase()),
+  );
+
+  senderValidationCache = { checkedAt: now, validSenders };
+  return validSenders.has(senderEmail.toLowerCase());
+}
+
+async function sendViaBrevo(params: {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+}) {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey || !EMAIL_CONFIG.from.address) {
+    return {
+      ok: false,
+      error: 'Email service is not configured. Contact support.',
+    } as const;
+  }
+
+  try {
+    const senderActive = await hasActiveBrevoSender(apiKey, EMAIL_CONFIG.from.address);
+    if (!senderActive) {
+      return {
+        ok: false,
+        error: `Sender ${EMAIL_CONFIG.from.address} is not active in Brevo. Validate sender or domain first.`,
+      } as const;
+    }
+  } catch (err) {
+    console.warn('[email] Sender validation check failed, continuing with send attempt:', err);
+  }
+
+  const res = await fetch(BREVO_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'api-key': apiKey,
+    },
+    body: JSON.stringify({
+      sender: {
+        name: EMAIL_CONFIG.from.name,
+        email: EMAIL_CONFIG.from.address,
+      },
+      to: [{ email: params.to }],
+      subject: params.subject,
+      htmlContent: params.html,
+      textContent: params.text,
+    }),
+  });
+
+  const raw = await res.text();
+  let payload: BrevoResponse | null = null;
+  try {
+    payload = raw ? (JSON.parse(raw) as BrevoResponse) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!res.ok) {
+    return {
+      ok: false,
+      error: payload?.message || `Brevo error (${res.status})`,
+    } as const;
+  }
+
+  return {
+    ok: true,
+    providerMessageId: payload?.messageId,
+  } as const;
+}
+
 // ── PUBLIC API ─────────────────────────────────────────────────
 
 export interface SendEmailResult {
   ok: boolean;
   error?: string;
+  providerMessageId?: string;
 }
 
 export async function sendOtpEmail(to: string, code: string): Promise<SendEmailResult> {
-  try {
-    await getTransport().sendMail({
-      from: `"${EMAIL_CONFIG.from.name}" <${EMAIL_CONFIG.from.address}>`,
-      to,
-      subject: `${code} — Your DASHR verification code`,
-      html: otpEmailHtml(code),
-    });
-    return { ok: true };
-  } catch (err) {
-    console.error('[email] Failed to send OTP:', err);
-    return { ok: false, error: 'Failed to send email. Please try again.' };
+  const result = await sendViaBrevo({
+    to,
+    subject: `${code} — Your DASHR verification code`,
+    html: otpEmailHtml(code),
+    text: `Your DASHR OTP is ${code}. It expires in ${OTP_CONFIG.expiryMinutes} minutes.`,
+  });
+
+  if (!result.ok) {
+    console.error('[email] Failed to send OTP:', result.error);
+    return { ok: false, error: result.error || 'Failed to send email. Please try again.' };
   }
+
+  return { ok: true, providerMessageId: result.providerMessageId };
 }
 
 /**
@@ -84,15 +179,13 @@ export async function sendEmail(params: {
   to: string;
   subject: string;
   html: string;
+  text?: string;
 }): Promise<SendEmailResult> {
-  try {
-    await getTransport().sendMail({
-      from: `"${EMAIL_CONFIG.from.name}" <${EMAIL_CONFIG.from.address}>`,
-      ...params,
-    });
-    return { ok: true };
-  } catch (err) {
-    console.error('[email] Failed to send:', err);
-    return { ok: false, error: 'Failed to send email.' };
+  const result = await sendViaBrevo(params);
+  if (!result.ok) {
+    console.error('[email] Failed to send:', result.error);
+    return { ok: false, error: result.error || 'Failed to send email.' };
   }
+
+  return { ok: true, providerMessageId: result.providerMessageId };
 }

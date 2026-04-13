@@ -57,3 +57,23 @@ export interface Strike {
   reason: string;
   created_at: string;
 }
+
+export interface NotificationItem {
+  id: string;
+  user_id: string;
+  order_id: string | null;
+  kind:
+    | 'order_placed'
+    | 'order_available'
+    | 'order_assigned_customer'
+    | 'order_assigned_agent'
+    | 'order_picked_up'
+    | 'order_delivered'
+    | 'order_cancelled'
+    | 'order_issue';
+  title: string;
+  message: string;
+  payload: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import type { User } from '@/types';
+import NotificationBell from '@/components/NotificationBell';
 
 interface AgentShellProps {
   children: React.ReactNode;
@@ -173,6 +174,8 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
         </ul>
 
         <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
+          <NotificationBell />
+
           {/* Online/offline status */}
           <button
             className="nav-cta"

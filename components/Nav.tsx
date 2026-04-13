@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import NotificationBell from '@/components/NotificationBell';
 
 interface NavProps {
   role?: 'customer' | 'agent' | 'admin';
@@ -98,6 +99,8 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
         </ul>
 
         <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
+          {userName && <NotificationBell />}
+
           {/* Agent online toggle */}
           {role === 'agent' && onToggleOnline && (
             <button

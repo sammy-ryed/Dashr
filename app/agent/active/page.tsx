@@ -45,8 +45,27 @@ export default function AgentActivePage() {
   async function markPickedUp() {
     if (!order) return;
     setUpdating(true);
-    await supabase.from('orders').update({ status: 'picked_up' }).eq('id', order.id);
-    setOrder({ ...order, status: 'picked_up' });
+    setError('');
+
+    try {
+      const res = await fetch('/api/orders/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id, status: 'picked_up' }),
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        setError(data.error || 'Failed to update order status.');
+        setUpdating(false);
+        return;
+      }
+
+      setOrder({ ...order, status: 'picked_up' });
+    } catch {
+      setError('Network error while updating order.');
+    }
+
     setUpdating(false);
   }
 
@@ -55,7 +74,24 @@ export default function AgentActivePage() {
     setUpdating(true);
     setError('');
 
-    await supabase.from('orders').update({ status: 'delivered' }).eq('id', order.id);
+    try {
+      const res = await fetch('/api/orders/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id, status: 'delivered' }),
+      });
+      const data = await res.json();
+
+      if (!data.ok) {
+        setError(data.error || 'Failed to mark delivery complete.');
+        setUpdating(false);
+        return;
+      }
+    } catch {
+      setError('Network error while updating order.');
+      setUpdating(false);
+      return;
+    }
 
     const weekStart = (() => {
       const d = new Date();
@@ -72,7 +108,7 @@ export default function AgentActivePage() {
     const { data: currentUser } = await supabase.from('users').select('total_deliveries').eq('id', agentId).single();
     await supabase.from('users').update({ total_deliveries: (currentUser?.total_deliveries || 0) + 1 }).eq('id', agentId);
 
-    const customerInfo = (order as any).customer;
+    const customerInfo = order.customer;
     setJustDeliveredOrder({
       id: order.id,
       customerName: customerInfo?.name || 'Customer',
@@ -85,7 +121,7 @@ export default function AgentActivePage() {
   }
 
   const shortId = order?.id.slice(-4).toUpperCase();
-  const customerInfo = order ? (order as any).customer : null;
+  const customerInfo = order?.customer || null;
 
   return (
     <AgentShell>

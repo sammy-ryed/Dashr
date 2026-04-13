@@ -11,6 +11,11 @@
  *   3. Use `config.features.yourFlag` in code
  */
 
+function intFromEnv(key: string, fallback: number) {
+  const parsed = Number(process.env[key]);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
 // ── FEATURE FLAGS ─────────────────────────────────────────────
 // Toggle features on/off without touching code
 export const FEATURES = {
@@ -81,10 +86,15 @@ export const OTP_CONFIG = {
 
 // ── EMAIL CONFIG ──────────────────────────────────────────────
 export const EMAIL_CONFIG = {
+  provider: 'brevo',
   from: {
-    name: 'DASHR',
-    address: process.env.GMAIL_USER || '',
+    name: process.env.BREVO_SENDER_NAME || 'DASHR',
+    address: process.env.BREVO_SENDER_EMAIL || '',
   },
+  dailySoftLimit: intFromEnv('EMAIL_DAILY_SOFT_LIMIT', 260),
+  dasherOpportunityMinCommission: intFromEnv('EMAIL_DASHER_MIN_COMMISSION', 70),
+  dasherOpportunityMaxRecipients: intFromEnv('EMAIL_DASHER_MAX_RECIPIENTS', 3),
+  dasherOpportunityCooldownMinutes: intFromEnv('EMAIL_DASHER_COOLDOWN_MINUTES', 45),
 } as const;
 
 // ── DERIVED TYPES ─────────────────────────────────────────────
@@ -105,7 +115,7 @@ export function validateEnv(): string[] {
   ];
 
   if (FEATURES.EMAIL_OTP) {
-    required.push('GMAIL_USER', 'GMAIL_APP_PASSWORD');
+    required.push('BREVO_API_KEY', 'BREVO_SENDER_EMAIL');
   }
 
   for (const key of required) {

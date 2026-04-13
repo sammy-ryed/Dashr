@@ -88,23 +88,35 @@ export default function OrderPage() {
     setLoading(true);
     setError('');
 
-    const payload = {
-      customer_id: user!.id,
-      item_description: itemDescription.trim(),
-      pickup_location: pickupLocation.trim(),
-      pickup_zone: zone,
-      delivery_hostel: hostel,
-      delivery_room: room.trim(),
-      order_value: Number(orderValue),
-      commission_amount: Number(commission),
-      min_commission: minComm,
-      payment_method: isAgentFloat ? 'agent_float' : 'upi_on_delivery',
-      status: 'pending',
-    };
+    try {
+      const res = await fetch('/api/orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemDescription: itemDescription.trim(),
+          pickupLocation: pickupLocation.trim(),
+          pickupZone: zone,
+          deliveryHostel: hostel,
+          deliveryRoom: room.trim(),
+          orderValue: Number(orderValue),
+          commissionAmount: Number(commission),
+          minCommission: minComm,
+          paymentMethod: isAgentFloat ? 'agent_float' : 'upi_on_delivery',
+        }),
+      });
 
-    const { data, error: insertError } = await supabase.from('orders').insert(payload).select('id').single();
-    if (insertError) { setError(insertError.message); setLoading(false); return; }
-    router.push(`/order/${data.id}/status`);
+      const data = await res.json();
+      if (!data.ok || !data.orderId) {
+        setError(data.error || 'Failed to place order');
+        setLoading(false);
+        return;
+      }
+
+      router.push(`/order/${data.orderId}/status`);
+    } catch {
+      setError('Network error.');
+      setLoading(false);
+    }
   }
 
   return (

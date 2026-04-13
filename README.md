@@ -12,7 +12,8 @@ If food delivery apps are a symphony, this repo is the drummer yelling "keep tim
 - Lets agents accept, manage, and complete active deliveries.
 - Lets admins manage moderation workflows like strike handling.
 - Uses Supabase for auth + data.
-- Supports OTP email auth and onboarding flows.
+- Uses realtime in-app notifications as the primary communication channel.
+- Uses Brevo for OTP and selective high-value transactional emails.
 - Includes OCR-assisted ID verification path for agent onboarding.
 
 ## Tech Stack
@@ -21,8 +22,9 @@ If food delivery apps are a symphony, this repo is the drummer yelling "keep tim
 - React 19
 - TypeScript
 - Supabase (`@supabase/supabase-js`, `@supabase/ssr`)
+- Supabase Realtime (in-app notifications)
 - Tailwind CSS 4
-- Nodemailer (OTP emails)
+- Brevo Transactional API (OTP + selective transactional emails)
 - Tesseract.js (ID OCR)
 
 ## Project Structure
@@ -31,10 +33,12 @@ High-value directories:
 
 - `app/` — routes, pages, and API handlers
 - `app/api/auth/*` — OTP + signup + password reset APIs
-- `app/api/orders/*` — order actions (accept, cancel, rate)
+- `app/api/orders/*` — order lifecycle APIs (create, accept, update-status, cancel, rate)
 - `app/api/admin/*` — admin controls (strikes, etc.)
 - `components/` — reusable UI blocks
-- `lib/` — config, helpers, Supabase clients, mail logic
+- `components/NotificationBell.tsx` — realtime notification UI
+- `lib/` — config, helpers, Supabase clients, mail logic, communication policy
+- `lib/communication-policy.ts` — selective email policy + daily budget enforcement
 - `supabase/migrations/` — SQL migrations and schema changes
 - `types/` — shared TypeScript types
 
@@ -56,8 +60,15 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 
 # required when email OTP is enabled
-GMAIL_USER=...
-GMAIL_APP_PASSWORD=...
+BREVO_API_KEY=...
+BREVO_SENDER_EMAIL=no-reply@yourdomain.com
+BREVO_SENDER_NAME=DASHR
+
+# optional email throttling
+EMAIL_DAILY_SOFT_LIMIT=260
+EMAIL_DASHER_MIN_COMMISSION=70
+EMAIL_DASHER_MAX_RECIPIENTS=3
+EMAIL_DASHER_COOLDOWN_MINUTES=45
 
 # optional
 NEXT_PUBLIC_UPI_ID=dashr@upi
@@ -66,7 +77,9 @@ NEXT_PUBLIC_UPI_ID=dashr@upi
 Notes:
 
 - `lib/config.ts` validates required env vars.
-- OTP email flow expects valid Gmail credentials when enabled.
+- OTP and transactional emails are sent via Brevo API.
+- `BREVO_SENDER_EMAIL` must be an active/verified Brevo sender (or verified domain sender).
+- After changing env vars, restart `npm run dev`.
 
 ### 3. Run the app
 
@@ -101,6 +114,22 @@ Also configurable:
 
 This means product changes can happen by editing one config file instead of launching a quest across 19 tabs.
 
+## Communication Architecture
+
+- Primary channel: realtime in-app notifications via `public.notifications` + Supabase Realtime.
+- Secondary channel: Brevo email for only high-value events.
+- Email budget policy is enforced in `lib/communication-policy.ts` with `EMAIL_DAILY_SOFT_LIMIT`, `EMAIL_DASHER_MIN_COMMISSION`, `EMAIL_DASHER_MAX_RECIPIENTS`, and `EMAIL_DASHER_COOLDOWN_MINUTES`.
+
+### Event Routing (In-App vs Email)
+
+- OTP request: Email (required)
+- Order placed: In-app customer confirmation + in-app dasher availability
+- New high-value order: Optional email to top dashers (policy-gated)
+- Order accepted: In-app updates + customer confirmation email
+- Picked up / out for delivery: In-app updates only
+- Delivered: In-app updates + customer completion email
+- Cancelled: In-app updates only
+
 ## Database
 
 Supabase migrations are in `supabase/migrations/`.
@@ -112,6 +141,7 @@ Current migration set includes:
 - RLS recursion fix
 - storage policies
 - ratings and additional fixes
+- notifications and email logs (`006_notifications_and_email_logs.sql`)
 
 Apply migrations with your preferred Supabase workflow before testing auth/order features.
 
@@ -124,7 +154,9 @@ Examples from the current app:
 - `POST /api/auth/signup`
 - `POST /api/auth/reset-password`
 - `POST /api/agent/verify-id`
+- `POST /api/orders/create`
 - `POST /api/orders/accept`
+- `POST /api/orders/update-status`
 - `POST /api/orders/cancel`
 - `POST /api/orders/rate`
 - admin strike routes under `/api/admin/strikes`
@@ -142,7 +174,16 @@ Examples from the current app:
 - App boots but auth fails:
 	Check Supabase env vars first.
 - OTP not sending:
-	Check `GMAIL_USER` and `GMAIL_APP_PASSWORD`.
+	Check `BREVO_API_KEY` and sender identity (`BREVO_SENDER_EMAIL`) in Brevo.
+- OTP API returns 200 but no email arrives:
+	1. Open Brevo Transactional logs and check event reason.
+	2. If reason says sender is invalid, verify/activate that sender in Brevo.
+	3. Ensure `.env.local` sender exactly matches an active Brevo sender email.
+	4. Restart dev server after env changes.
+- Realtime notifications not appearing:
+	1. Ensure migration `006_notifications_and_email_logs.sql` is applied.
+	2. Confirm `public.notifications` is in `supabase_realtime` publication.
+	3. Verify the signed-in user matches `notifications.user_id` under RLS.
 - ID verification weirdness:
 	OCR is best-effort; review fallback behavior in `app/api/agent/verify-id/route.ts`.
 
