@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase';
+import { getUserSafe } from '@/lib/auth';
 import type { NotificationItem } from '@/types';
 import styles from './NotificationBell.module.css';
 
 const MAX_NOTIFICATIONS = 20;
+const FALLBACK_POLL_INTERVAL = 30_000; // 30 seconds if realtime fails
 
 function timeAgo(iso: string) {
   const ms = Date.now() - new Date(iso).getTime();
@@ -20,28 +22,41 @@ function timeAgo(iso: string) {
 export default function NotificationBell() {
   const supabase = createClient();
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const fallbackPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [userId, setUserId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState(false);
 
   const loadForUser = useCallback(async (targetUserId: string) => {
-    const { data } = await supabase
-      .from('notifications')
-      .select('id, user_id, order_id, kind, title, message, payload, is_read, created_at')
-      .eq('user_id', targetUserId)
-      .order('created_at', { ascending: false })
-      .limit(MAX_NOTIFICATIONS);
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id, user_id, order_id, kind, title, message, payload, is_read, created_at')
+        .eq('user_id', targetUserId)
+        .order('created_at', { ascending: false })
+        .limit(MAX_NOTIFICATIONS);
 
-    setNotifications((data as NotificationItem[]) || []);
+      if (error) {
+        console.error('[NotificationBell] Query error:', error);
+        return;
+      }
+
+      setNotifications((data as NotificationItem[]) || []);
+    } catch (err) {
+      console.error('[NotificationBell] Unexpected error loading notifications:', err);
+    }
   }, [supabase]);
 
+  // Initial load and auth check
   useEffect(() => {
     let active = true;
 
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getUserSafe(supabase);
       if (!active) return;
 
       if (!user) {
@@ -62,8 +77,11 @@ export default function NotificationBell() {
     };
   }, [loadForUser, supabase]);
 
+  // Realtime subscription with error handling and fallback
   useEffect(() => {
     if (!userId) return;
+
+    let isActive = true;
 
     const channel = supabase
       .channel(`notifications-${userId}`)
@@ -76,16 +94,61 @@ export default function NotificationBell() {
           filter: `user_id=eq.${userId}`,
         },
         () => {
-          loadForUser(userId);
+          if (isActive && userId) {
+            loadForUser(userId);
+          }
         },
       )
-      .subscribe();
+      .subscribe(
+        async (status: string) => {
+          if (!isActive) return;
+
+          if (status === 'SUBSCRIBED') {
+            setSubscriptionError(false);
+            // Clear any fallback polling since realtime is working
+            if (fallbackPollRef.current) {
+              clearInterval(fallbackPollRef.current);
+              fallbackPollRef.current = null;
+            }
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            setSubscriptionError(true);
+            // Activate fallback polling only once
+            if (!fallbackPollRef.current) {
+              fallbackPollRef.current = setInterval(() => {
+                if (isActive && userId) {
+                  loadForUser(userId);
+                }
+              }, FALLBACK_POLL_INTERVAL);
+            }
+          }
+        },
+        () => {
+          if (!isActive) return;
+          setSubscriptionError(true);
+          // Activate fallback polling on subscription error
+          if (!fallbackPollRef.current) {
+            fallbackPollRef.current = setInterval(() => {
+              if (isActive && userId) {
+                loadForUser(userId);
+              }
+            }, FALLBACK_POLL_INTERVAL);
+          }
+        },
+      );
+
+    subscriptionRef.current = channel;
 
     return () => {
+      isActive = false;
       supabase.removeChannel(channel);
+      if (fallbackPollRef.current) {
+        clearInterval(fallbackPollRef.current);
+        fallbackPollRef.current = null;
+      }
     };
   }, [loadForUser, userId, supabase]);
 
+  // Outside click handler
   useEffect(() => {
     function onClickOutside(event: MouseEvent) {
       if (!rootRef.current) return;
@@ -106,22 +169,30 @@ export default function NotificationBell() {
   async function markAllRead() {
     if (!userId || unreadCount === 0) return;
 
-    await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('user_id', userId)
-      .eq('is_read', false);
+    try {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
 
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    } catch (err) {
+      console.error('[NotificationBell] Error marking all as read:', err);
+    }
   }
 
   async function markOneRead(notificationId: string) {
-    await supabase
-      .from('notifications')
-      .update({ is_read: true })
-      .eq('id', notificationId);
+    try {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notificationId);
 
-    setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n)));
+      setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n)));
+    } catch (err) {
+      console.error('[NotificationBell] Error marking one as read:', err);
+    }
   }
 
   if (loading || !userId) {
@@ -135,10 +206,18 @@ export default function NotificationBell() {
         onClick={() => setOpen((s) => !s)}
         aria-label="Notifications"
         className={styles.button}
-        title={unreadCount > 0 ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}` : 'Notifications'}
+        title={
+          subscriptionError
+            ? 'Notifications (connection issue, using fallback)'
+            : unreadCount > 0
+              ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}`
+              : 'Notifications'
+        }
+        data-error={subscriptionError ? 'true' : undefined}
       >
         <span className={styles.label}>NOTIF</span>
-        {unreadCount > 0 && (
+        {subscriptionError && <span className={styles.errorDot} aria-label="Connection issue" />}
+        {unreadCount > 0 && !subscriptionError && (
           <span className={styles.badge} aria-label={`${unreadCount} unread`}>
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
@@ -149,6 +228,11 @@ export default function NotificationBell() {
         <div className={styles.panel}>
           <div className={styles.header}>
             <span className={styles.title}>Notifications</span>
+            {subscriptionError && (
+              <span className={styles.errorMsg} title="Using fallback polling every 30 seconds">
+                Connection issue
+              </span>
+            )}
             <button
               type="button"
               onClick={markAllRead}

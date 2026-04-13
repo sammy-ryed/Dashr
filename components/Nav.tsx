@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
@@ -21,6 +21,8 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
   const supabase = createClient();
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [navHidden, setNavHidden] = useState(false);
+  const lastScrollYRef = useRef(0);
 
   // Session management: 16hr auto-logout
   useEffect(() => {
@@ -41,6 +43,35 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
     }, 60_000);
     return () => clearInterval(interval);
   }, []);
+
+  // Hide nav on scroll down, reveal on scroll up (desktop + mobile)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    lastScrollYRef.current = window.scrollY;
+    const SCROLL_DELTA_THRESHOLD = 8;
+    const TOP_SAFE_ZONE = 24;
+
+    function onScroll() {
+      const currentY = window.scrollY;
+      const delta = currentY - lastScrollYRef.current;
+
+      if (Math.abs(delta) < SCROLL_DELTA_THRESHOLD) return;
+
+      if (currentY <= TOP_SAFE_ZONE || menuOpen) {
+        setNavHidden(false);
+      } else if (delta > 0) {
+        setNavHidden(true);
+      } else {
+        setNavHidden(false);
+      }
+
+      lastScrollYRef.current = currentY;
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [menuOpen]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -72,7 +103,7 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
 
   return (
     <>
-      <nav className="nav">
+      <nav className={`nav ${navHidden && !menuOpen ? 'nav-hidden' : ''}`}>
         <Link href="/" className="nav-logo">
           DASHR<sup>SRM</sup>
         </Link>
@@ -99,37 +130,46 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
         </ul>
 
         <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
-          {userName && <NotificationBell />}
+          {/* Right-side controls group */}
+          <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginLeft: 'auto' }}>
+            {/* Agent online toggle */}
+            {role === 'agent' && onToggleOnline && (
+              <button
+                className={`nav-online-btn ${isOnline ? 'is-online' : ''}`}
+                onClick={onToggleOnline}
+              >
+                <div className="status-dot-pulse" />
+                {isOnline ? 'On Duty' : 'Off Duty'}
+              </button>
+            )}
 
-          {/* Agent online toggle */}
-          {role === 'agent' && onToggleOnline && (
-            <button
-              className={`nav-online-btn ${isOnline ? 'is-online' : ''}`}
-              onClick={onToggleOnline}
-            >
-              <div className="status-dot-pulse" />
-              {isOnline ? 'On Duty' : 'Off Duty'}
-            </button>
-          )}
+            {/* Notification Bell + User Menu unified group */}
+            {userName && (
+              <>
+                {/* Notification Bell */}
+                <NotificationBell />
 
-          {/* User badge — clicking opens hamburger menu on desktop too */}
-          {!isLoading && userName && !(role === 'agent' && onToggleOnline) && (
-            <button
-              className="nav-user"
-              onClick={() => setMenuOpen(!menuOpen)}
-              style={{ textDecoration: 'none', background: 'none', border: 'none', cursor: 'pointer' }}
-            >
-              <div className="nav-user-avatar">{initial}</div>
-              <span className="nav-user-name">{userName.split(' ')[0]}</span>
-            </button>
-          )}
+                {/* User badge — clicking opens hamburger menu on desktop too */}
+                {!isLoading && !(role === 'agent' && onToggleOnline) && (
+                  <button
+                    className="nav-user"
+                    onClick={() => setMenuOpen(!menuOpen)}
+                    style={{ textDecoration: 'none', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    <div className="nav-user-avatar">{initial}</div>
+                    <span className="nav-user-name">{userName.split(' ')[0]}</span>
+                  </button>
+                )}
+              </>
+            )}
 
-          {/* Login link if not logged in — only show after loading is done */}
-          {!isLoading && !userName && !(role === 'agent') && (
-            <Link href="/login" className="nav-cta" style={{ display: 'flex', alignItems: 'center' }}>
-              Login
-            </Link>
-          )}
+            {/* Login link if not logged in — only show after loading is done */}
+            {!isLoading && !userName && !(role === 'agent') && (
+              <Link href="/login" className="nav-cta" style={{ display: 'flex', alignItems: 'center' }}>
+                Login
+              </Link>
+            )}
+          </div>
 
           {/* Mobile hamburger */}
           <button

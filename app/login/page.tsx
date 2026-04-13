@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { getUserSafe } from '@/lib/auth';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 type SignupStep = 'email' | 'otp' | 'password';
@@ -63,7 +64,7 @@ function LoginContent() {
     }
 
     // Get user role for routing
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getUserSafe(supabase);
     if (!user) { router.push('/onboarding'); return; }
 
     const { data: profile } = await supabase.from('users').select('role, name').eq('id', user.id).single();

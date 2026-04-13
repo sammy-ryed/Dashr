@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase';
+import { getUserSafe } from '@/lib/auth';
 import { format, parseISO } from 'date-fns';
 import AgentShell from '@/components/AgentShell';
 import type { LedgerEntry } from '@/types';
@@ -22,7 +23,7 @@ export default function AgentLedgerPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getUserSafe(supabase);
       if (!user) return;
 
       const { data: entries } = await supabase

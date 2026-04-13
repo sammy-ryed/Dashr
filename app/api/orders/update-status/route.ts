@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { createAdminClient, createClient } from '@/lib/supabase-server';
+import { getUserSafe } from '@/lib/auth';
 import { apiError, apiSuccess, withErrorHandling } from '@/lib/api-helpers';
 import { sendTrackedEmail } from '@/lib/communication-policy';
 
@@ -18,9 +19,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   }
 
   const authClient = await createClient();
-  const {
-    data: { user },
-  } = await authClient.auth.getUser();
+  const user = await getUserSafe(authClient);
 
   if (!user) {
     return apiError('Unauthorized', 401);

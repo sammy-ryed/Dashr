@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
+import { getUserSafe } from '@/lib/auth';
 import { ORDER_STATUS_STEPS, FEATURES, UPI_ID } from '@/lib/config';
 import Nav from '@/components/Nav';
 import RatingModal from '@/components/RatingModal';
@@ -25,7 +26,7 @@ export default function OrderStatusPage() {
 
   useEffect(() => {
     async function init() {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const authUser = await getUserSafe(supabase);
       if (authUser) {
         const { data: profile } = await supabase.from('users').select('name, role').eq('id', authUser.id).single();
         const p = profile as { name: string; role: string } | null;

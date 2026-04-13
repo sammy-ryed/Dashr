@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
+import { getUserSafe } from '@/lib/auth';
 import Nav from '@/components/Nav';
 import MarqueeBar from '@/components/MarqueeBar';
 import type { Order } from '@/types';
@@ -37,7 +38,7 @@ export default function OrdersPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const authUser = await getUserSafe(supabase);
       if (!authUser) { router.push('/login'); return; }
 
       const { data: profile } = await supabase.from('users').select('name, role').eq('id', authUser.id).single();

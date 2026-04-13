@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { getUserSafe } from '@/lib/auth';
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
               cookiesToSet.forEach(({ name, value, options }) =>
                 cookieStore.set(name, value, options)
               );
-            } catch (error) {
+            } catch {
               // The `setAll` method was called from a Server Component.
               // This can be ignored if you have middleware refreshing
               // user sessions.
@@ -36,7 +37,7 @@ export async function GET(request: Request) {
     
     if (!error) {
       // Fetch user profile for role-based routing if they clicked a magic link
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getUserSafe(supabase);
       if (user) {
         const { data: profile } = await supabase
           .from('users')

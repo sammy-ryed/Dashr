@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { getUserSafe } from '@/lib/auth';
 import { COMMISSION_FLOORS, AGENT_FLOAT_THRESHOLD, ZONE_LABELS, SRM_HOSTELS_NEW, ABODE_BLOCKS } from '@/lib/config';
 import Nav from '@/components/Nav';
 import MarqueeBar from '@/components/MarqueeBar';
@@ -38,7 +39,7 @@ export default function OrderPage() {
 
   useEffect(() => {
     async function init() {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const authUser = await getUserSafe(supabase);
       if (authUser) {
         const { data: profile } = await supabase.from('users').select('name, role').eq('id', authUser.id).single();
         const p = profile as { name: string; role: string } | null;

@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { getUserSafe } from '@/lib/auth';
 
 function OnboardingContent() {
   const router = useRouter();
@@ -47,7 +48,7 @@ function OnboardingContent() {
     setLoading(true);
     setError('');
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getUserSafe(supabase);
     if (!user) { router.push('/login'); return; }
 
     const { error: upsertError } = await supabase.from('users').upsert({
@@ -74,7 +75,7 @@ function OnboardingContent() {
     setLoading(true);
     setError('');
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getUserSafe(supabase);
     if (!user) { router.push('/login'); return; }
 
     const ext = idFile.name.split('.').pop();

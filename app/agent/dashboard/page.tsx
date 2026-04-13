@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase';
+import { getUserSafe } from '@/lib/auth';
 import OrderCard from '@/components/OrderCard';
 import AgentShell from '@/components/AgentShell';
 import type { Order, User } from '@/types';
@@ -28,7 +29,7 @@ export default function AgentDashboard() {
 
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getUserSafe(supabase);
       if (!user) return;
 
       const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();

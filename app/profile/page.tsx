@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { getUserSafe } from '@/lib/auth';
 import Nav from '@/components/Nav';
 
 export default function ProfilePage() {
@@ -15,7 +16,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getUserSafe(supabase);
       if (!user) {
         router.push('/login');
         return;

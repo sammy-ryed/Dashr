@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { getUserSafe } from '@/lib/auth';
 import type { User } from '@/types';
 import NotificationBell from '@/components/NotificationBell';
 
@@ -31,10 +32,12 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
   const [menuOpen, setMenuOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [customerMode, setCustomerMode] = useState(false);
+  const [navHidden, setNavHidden] = useState(false);
+  const lastScrollYRef = useRef(0);
 
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getUserSafe(supabase);
       if (!user) { router.push('/login'); return; }
 
       const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
@@ -112,6 +115,35 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
     };
   }, [agent?.id, agent?.is_online]);
 
+  // Hide nav on scroll down, reveal on scroll up (desktop + mobile)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    lastScrollYRef.current = window.scrollY;
+    const SCROLL_DELTA_THRESHOLD = 8;
+    const TOP_SAFE_ZONE = 24;
+
+    function onScroll() {
+      const currentY = window.scrollY;
+      const delta = currentY - lastScrollYRef.current;
+
+      if (Math.abs(delta) < SCROLL_DELTA_THRESHOLD) return;
+
+      if (currentY <= TOP_SAFE_ZONE || menuOpen) {
+        setNavHidden(false);
+      } else if (delta > 0) {
+        setNavHidden(true);
+      } else {
+        setNavHidden(false);
+      }
+
+      lastScrollYRef.current = currentY;
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [menuOpen]);
+
   async function toggleOnline() {
     if (!agent) return;
     const newState = !agent.is_online;
@@ -156,7 +188,7 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
   return (
     <div>
       {/* Top nav with hamburger */}
-      <nav className="nav">
+      <nav className={`nav ${navHidden && !menuOpen ? 'nav-hidden' : ''}`}>
         <Link href="/" className="nav-logo">DASHR<sup>SRM</sup></Link>
 
         {/* Desktop nav links (visible on desktop, hidden on mobile) */}
@@ -174,7 +206,10 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
         </ul>
 
         <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
-          <NotificationBell />
+          {/* Right-side controls group */}
+          <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginLeft: 'auto' }}>
+            <NotificationBell />
+          </div>
 
           {/* Online/offline status */}
           <button

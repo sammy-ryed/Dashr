@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
+import { getUserSafe } from '@/lib/auth';
 import { format, parseISO } from 'date-fns';
 import type { Order, User } from '@/types';
 
@@ -30,7 +31,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getUserSafe(supabase);
       if (!user) { router.push('/login'); return; }
       const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
       if (profile?.role !== 'admin') { router.push('/order'); return; }

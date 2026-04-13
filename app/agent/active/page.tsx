@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
+import { getUserSafe } from '@/lib/auth';
 import AgentShell from '@/components/AgentShell';
 import RatingModal from '@/components/RatingModal';
 import type { Order } from '@/types';
@@ -23,7 +24,7 @@ export default function AgentActivePage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getUserSafe(supabase);
       if (!user) return;
       setAgentId(user.id);
 
