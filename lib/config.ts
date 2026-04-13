@@ -66,10 +66,50 @@ export const ORDER_STATUS_STEPS = [
 ] as const;
 
 // ── SRM HOSTELS ───────────────────────────────────────────────
+// Block names from A-Z, excluding I, O, X (which don't exist)
+export const VALID_BLOCKS = [
+  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',
+  'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'Y', 'Z',
+] as const;
+
+export const SRM_HOSTELS_NEW = {
+  boys: [
+    'Sannasi A',
+    'Sannasi C',
+    'Manoranjitham',
+    'Mullai',
+    'Paari',
+    'Kaari',
+    'Oori',
+    'Adiyaman',
+    'Nelson Mandela Block',
+    'Began',
+  ],
+  girls: [
+    'ESQ A',
+    'ESQ B',
+    'Shenbagam',
+    'Kalpana Chawla',
+    'Meenakshi',
+    'Kopperundevi (M Block)',
+  ],
+  international: [
+    'Green Pearl',
+    'NRI Hostel',
+    'Tamarai',
+    'Malligai',
+  ],
+} as const;
+
+// Abode location with block structure
+export const ABODE_BLOCKS = VALID_BLOCKS;
+
+// Flat list for backward compatibility if needed
 export const SRM_HOSTELS = [
-  'Himalaya Block', 'Kaveri Block', 'Ganga Block', 'Yamuna Block',
-  'Godavari Block', 'Sindhu Block', 'Krishna Block', 'Tungabhadra Block',
-  'Narmada Block', 'Brahmaputra Block', 'Mahanadi Block', 'Alaknanda Block',
+  'Sannasi A', 'Sannasi C', 'Manoranjitham', 'Mullai', 'Paari', 'Kaari', 'Oori', 'Adiyaman',
+  'Nelson Mandela Block', 'Began', 'ESQ A', 'ESQ B', 'Shenbagam', 'Kalpana Chawla',
+  'Meenakshi', 'Kopperundevi (M Block)', 'Green Pearl', 'NRI Hostel', 'Tamarai', 'Malligai',
+  'Abode', 'Other (Custom)',
 ] as const;
 
 // ── OTP CONFIG ────────────────────────────────────────────────
