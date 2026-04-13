@@ -11,9 +11,11 @@ type ForgotStep = 'email' | 'otp';
 
 function LoginContent() {
   const router = useRouter();
-  const params = useSearchParams();
-  const resetDone = params.get('reset') === 'done';
-  const errorParam = params.get('error');
+  const searchParams = useSearchParams();
+  
+  // Safely access search params to avoid hydration mismatch
+  const resetDone = searchParams ? searchParams.get('reset') === 'done' : false;
+  const errorParam = searchParams ? searchParams.get('error') : '';
 
   const supabase = createClient();
 
@@ -207,7 +209,7 @@ function LoginContent() {
                     className="inp"
                     id="login-email"
                     type="email"
-                    placeholder="you@srmist.edu.in"
+                    placeholder="bhadu@gmail.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && document.getElementById('login-password')?.focus()}
@@ -276,7 +278,7 @@ function LoginContent() {
                         className="inp"
                         id="signup-email"
                         type="email"
-                        placeholder="you@srmist.edu.in"
+                        placeholder="bhadu@gmail.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && sendSignupOtp()}
@@ -374,7 +376,7 @@ function LoginContent() {
                         className="inp"
                         id="forgot-email"
                         type="email"
-                        placeholder="you@srmist.edu.in"
+                        placeholder="bhadu@gmail.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && sendForgotOtp()}
