@@ -1,0 +1,313 @@
+.container {
+  position: relative;
+  margin-right: 0.5rem;
+  display: inline-block;
+}
+
+.button {
+  height: 2.4rem;
+  min-width: 2.4rem;
+  padding: 0 0.6rem;
+  border: 0.12rem solid #2a2a2a;
+  background: var(--surf);
+  color: var(--white);
+  cursor: pointer;
+  position: relative;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  transition: var(--t);
+  border-radius: 0.25rem;
+}
+
+.button:hover {
+  background: var(--surf2);
+  border-color: var(--yellow);
+  box-shadow: 0 0 0.8rem rgba(233, 181, 11, 0.2);
+}
+
+.button:active {
+  transform: scale(0.98);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.label {
+  display: block;
+  letter-spacing: 0.05em;
+}
+
+.badge {
+  position: absolute;
+  right: -0.5rem;
+  top: -0.5rem;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 0.55rem;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  padding: 0 0.2rem;
+  animation: badgePulse 2s ease-in-out infinite;
+  border: 0.08rem solid var(--bg);
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(233, 181, 11, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 0.4rem rgba(233, 181, 11, 0);
+  }
+}
+
+.panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.6rem);
+  width: min(32rem, calc(90vw - 1rem));
+  max-height: 70vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 120;
+  background: var(--surface, #101010);
+  border: 0.14rem solid #2a2a2a;
+  border-radius: 0.35rem;
+  box-shadow:
+    0 1rem 2.5rem rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(233, 181, 11, 0.1);
+  animation: panelFadeIn 0.15s ease-out;
+}
+
+@keyframes panelFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-0.8rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel::-webkit-scrollbar {
+  width: 0.5rem;
+}
+
+.panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel::-webkit-scrollbar-thumb {
+  background: rgba(233, 181, 11, 0.3);
+  border-radius: 0.25rem;
+}
+
+.panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(233, 181, 11, 0.5);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.9rem 1rem;
+  border-bottom: 0.08rem solid #2a2a2a;
+  gap: 0.8rem;
+  position: sticky;
+  top: 0;
+  background: var(--surf);
+  z-index: 10;
+}
+
+.title {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--yellow);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.markAllBtn {
+  background: transparent;
+  border: none;
+  color: var(--yellow);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--t);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.markAllBtn:hover:not(:disabled) {
+  color: var(--white);
+  text-shadow: 0 0 0.6rem rgba(233, 181, 11, 0.5);
+}
+
+.markAllBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(70vh - 3rem);
+  overflow-y: auto;
+}
+
+.empty {
+  padding: 1.5rem 1rem;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.notification {
+  padding: 0.9rem 1rem;
+  border-bottom: 0.06rem solid #1a1a1a;
+  background: transparent;
+  transition: var(--t);
+}
+
+.notification.unread {
+  background: rgba(233, 181, 11, 0.06);
+  border-left: 0.12rem solid var(--yellow);
+  padding-left: calc(1rem - 0.12rem);
+}
+
+.notification:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.notificationHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin-bottom: 0.4rem;
+}
+
+.notificationTitle {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--white);
+  flex: 1;
+  word-break: break-word;
+}
+
+.notificationTime {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.notificationMessage {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  color: #d0d0d0;
+  line-height: 1.4;
+  margin-top: 0.4rem;
+  word-break: break-word;
+}
+
+.markReadBtn {
+  margin-top: 0.6rem;
+  background: transparent;
+  border: none;
+  color: var(--yellow);
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: var(--t);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.markReadBtn:hover {
+  color: var(--white);
+  text-shadow: 0 0 0.4rem rgba(233, 181, 11, 0.6);
+}
+
+.markReadBtn:active {
+  transform: scale(0.95);
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .button {
+    height: 2.2rem;
+    min-width: 2.2rem;
+    font-size: 0.7rem;
+  }
+
+  .panel {
+    width: calc(90vw - 1rem);
+    max-height: 60vh;
+  }
+
+  .notificationHeader {
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .notificationTime {
+    align-self: flex-start;
+  }
+
+  .notification {
+    padding: 0.8rem 0.9rem;
+  }
+
+  .notification.unread {
+    padding-left: calc(0.9rem - 0.12rem);
+  }
+}
+
+/* Dark mode animation for pulse effect */
+@media (prefers-reduced-motion: reduce) {
+  .badge {
+    animation: none;
+  }
+
+  .panel {
+    animation: none;
+  }
+
+  .button,
+  .markAllBtn,
+  .markReadBtn,
+  .notification {
+    transition: none !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: more) {
+  .button {
+    border-width: 0.16rem;
+  }
+
+  .notification.unread {
+    border-left-width: 0.16rem;
+  }
+}

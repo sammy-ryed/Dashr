@@ -15,6 +15,7 @@ If food delivery apps are a symphony, this repo is the drummer yelling "keep tim
 - Uses realtime in-app notifications as the primary communication channel.
 - Uses Brevo for OTP and selective high-value transactional emails.
 - Includes OCR-assisted ID verification path for agent onboarding.
+- **Progressive Web App (PWA)** with offline support, installable on all devices.
 
 ## Tech Stack
 
@@ -36,9 +37,13 @@ High-value directories:
 - `app/api/orders/*` — order lifecycle APIs (create, accept, update-status, cancel, rate)
 - `app/api/admin/*` — admin controls (strikes, etc.)
 - `components/` — reusable UI blocks
-- `components/NotificationBell.tsx` — realtime notification UI
+- `components/NotificationBell.tsx` — realtime notification UI with CSS module styling
+- `components/NotificationBell.module.css` — professional notification panel styles
 - `lib/` — config, helpers, Supabase clients, mail logic, communication policy
 - `lib/communication-policy.ts` — selective email policy + daily budget enforcement
+- `public/` — static assets, favicons, PWA service worker, manifest
+- `public/manifest.json` — PWA app manifest with shortcuts and icon definitions
+- `public/sw.js` — Service Worker for offline support and caching
 - `supabase/migrations/` — SQL migrations and schema changes
 - `types/` — shared TypeScript types
 
@@ -190,3 +195,35 @@ Examples from the current app:
 ## Final Note
 
 This codebase is serious about delivery flow, but not serious enough to pretend every bug is "expected behavior." If something looks odd, it probably is. Open an issue, fix it, and claim hero status.
+
+## Progressive Web App (PWA) Features
+
+DASHR is a full PWA, meaning:
+
+- **Install on Home Screen**: Users can install DASHR directly from their browser (Chrome, Firefox, Safari on iOS) without the App Store.
+- **Offline Support**: Service worker caches critical assets and API calls, allowing basic navigation offline.
+- **App Shell**: Runs in standalone mode (full screen, no browser chrome) on mobile and desktop.
+- **Push Notifications**: Foundation ready for native push notifications (WebPush API).
+- **Icons & Branding**: Custom adaptive icons for all device types (Android, iOS, Windows, macOS).
+
+### Installation Instructions
+
+**Mobile/Desktop (Android, iOS, macOS, Windows):**
+
+1. Open DASHR in your browser
+2. Look for an "Install" or "Add to Home Screen" prompt
+3. Tap/click it, confirm the installation
+4. DASHR now appears as a native app on your home screen
+
+**On iOS:**
+
+1. Open DASHR in Safari
+2. Tap the Share button (square with arrow)
+3. Scroll and select "Add to Home Screen"
+4. DASHR now available as a shortcut
+
+**Offline Mode:**
+
+- Network-first strategy for API calls (fresh data when online, cached on retry)
+- Cache-first for static assets (instant load, background refresh)
+- Graceful fallback on total offline (shows offline notice, retries on reconnect)
