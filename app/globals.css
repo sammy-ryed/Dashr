@@ -1277,3 +1277,320 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   transition: var(--t);
 }
 .nav-legal-links a:hover { color: var(--yellow); }
+
+/* ── ABOUT PANEL ─────────────────────────────────────── */
+.about-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.about-panel {
+  background: linear-gradient(160deg, #141414 0%, #0c0c0c 100%);
+  border: 0.2rem solid var(--yellow);
+  box-shadow: 0.8rem 0.8rem 0 var(--yellow);
+  width: 100%;
+  max-width: 30rem;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: fadeInUp 0.35s cubic-bezier(0.23, 1, 0.32, 1);
+  overflow: hidden;
+  position: relative;
+}
+
+.about-panel::before {
+  content: 'DASHR';
+  position: absolute;
+  bottom: -2rem;
+  right: -1rem;
+  font-family: var(--font);
+  font-size: 7rem;
+  font-weight: 900;
+  color: rgba(233, 181, 11, 0.04);
+  line-height: 1;
+  pointer-events: none;
+  letter-spacing: -0.04em;
+  user-select: none;
+}
+
+.about-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.4rem 1.6rem;
+  border-bottom: 0.14rem solid #2a2a2a;
+  background: rgba(233, 181, 11, 0.04);
+  flex-shrink: 0;
+}
+
+.about-label {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.25em;
+  color: var(--yellow);
+  margin-bottom: 0.3rem;
+}
+
+.about-title {
+  font-family: var(--font);
+  font-size: 2rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  color: var(--white);
+  line-height: 1;
+}
+
+.about-title sup {
+  font-size: 0.6rem;
+  color: var(--yellow);
+  font-family: var(--mono);
+  letter-spacing: 0.1em;
+  vertical-align: super;
+  margin-left: 0.15rem;
+}
+
+.about-close {
+  background: none;
+  border: 0.14rem solid #333;
+  color: var(--muted);
+  font-size: 1.1rem;
+  width: 2.2rem;
+  height: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.about-close:hover {
+  border-color: var(--yellow);
+  color: var(--yellow);
+  background: rgba(233, 181, 11, 0.08);
+  transform: rotate(90deg);
+}
+
+.about-scroll {
+  overflow-y: auto;
+  flex: 1;
+  padding: 1.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+
+/* Origin Story */
+.about-story {
+  background: var(--surf);
+  border: 0.14rem solid #2a2a2a;
+  border-left: 0.3rem solid var(--yellow);
+  padding: 1.2rem 1.4rem;
+  position: relative;
+}
+
+.about-story-label {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  color: var(--yellow);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  opacity: 0.8;
+}
+
+.about-story-text {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: #bbb;
+  line-height: 1.9;
+  letter-spacing: 0.02em;
+  margin: 0 0 0.8rem 0;
+}
+
+.about-story-text:last-child { margin-bottom: 0; }
+
+.about-hl {
+  color: var(--yellow);
+  font-weight: 700;
+}
+
+/* Divider */
+.about-divider {
+  height: 0.12rem;
+  background: linear-gradient(90deg, transparent, var(--yellow), transparent);
+  opacity: 0.4;
+}
+
+/* Founders section */
+.about-founders-label {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  text-align: center;
+  margin-bottom: -0.4rem;
+}
+
+.about-founders {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.about-card {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  background: var(--surf);
+  border: 0.14rem solid #2a2a2a;
+  padding: 1.1rem 1.2rem;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.about-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(233,181,11,0.04) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.about-card:hover {
+  border-color: var(--yellow);
+  box-shadow: 0.35rem 0.35rem 0 var(--yellow);
+  transform: translateY(-2px);
+}
+
+.about-photo-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.about-photo {
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+  filter: grayscale(20%) contrast(1.05);
+  transition: filter 0.3s ease;
+}
+
+.about-card:hover .about-photo {
+  filter: grayscale(0%) contrast(1.1);
+}
+
+.about-photo-ring {
+  position: absolute;
+  inset: -0.25rem;
+  border: 0.14rem solid var(--yellow);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.about-card:hover .about-photo-ring {
+  opacity: 1;
+}
+
+.about-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.about-card-role {
+  font-family: var(--mono);
+  font-size: 0.52rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--yellow);
+  margin-bottom: 0.25rem;
+}
+
+.about-card-name {
+  font-family: var(--font);
+  font-size: 1.05rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--white);
+  line-height: 1;
+  margin-bottom: 0.2rem;
+}
+
+.about-card-handle {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  color: #555;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.6rem;
+}
+
+.about-card-links {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.about-link {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  background: var(--yellow);
+  padding: 0.25em 0.7em;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  border: 0.1rem solid transparent;
+}
+
+.about-link:hover {
+  background: transparent;
+  color: var(--yellow);
+  border-color: var(--yellow);
+}
+
+/* Footer note */
+.about-footer-note {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: #444;
+  text-align: center;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding-top: 0.5rem;
+  border-top: 0.08rem solid #1e1e1e;
+}
+
+@media (max-width: 480px) {
+  .about-panel {
+    max-height: 95vh;
+    box-shadow: 0.5rem 0.5rem 0 var(--yellow);
+  }
+
+  .about-header { padding: 1.1rem 1.2rem; }
+  .about-scroll { padding: 1.2rem; gap: 1.1rem; }
+  .about-photo { width: 3.8rem; height: 3.8rem; }
+  .about-card-name { font-size: 0.95rem; }
+}
