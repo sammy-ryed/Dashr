@@ -53,9 +53,8 @@ export const metadata: Metadata = {
   },
   manifest: '/manifest.json',
   icons: [
-    { rel: 'icon', url: '/favicon.ico' },
-    { rel: 'icon', url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
     { rel: 'icon', url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    { rel: 'icon', url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
     { rel: 'apple-touch-icon', url: '/apple-touch-icon.png', sizes: '180x180' },
   ],
   appleWebApp: {
@@ -86,11 +85,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="msapplication-TileColor" content="#0f0f0f" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="shortcut icon" href="/favicon.ico" />
+        <link rel="shortcut icon" type="image/png" href="/favicon-32x32.png" />
         {/* Google Fonts — preload to avoid render block */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

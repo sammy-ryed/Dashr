@@ -1,7 +1,8 @@
 const CACHE_NAME = 'dashr-v2';
 const STATIC_ASSETS = [
   '/manifest.json',
-  '/favicon.ico',
+  '/favicon-16x16.png',
+  '/favicon-32x32.png',
   '/icon-192x192.png',
   '/icon-512x512.png',
 ];
