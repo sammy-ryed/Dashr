@@ -23,7 +23,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     return apiError('Forbidden', 403);
   }
 
-  // Input length guards — prevent DoS via huge OCR payloads
+  // Input length guards
   if (typeof srmId !== 'string' || srmId.length > 50) {
     return apiError('Invalid SRM ID', 400);
   }
@@ -57,27 +57,8 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     );
   }
 
-  // Attempt OCR with tesseract.js (server-side)
-  let nameMatchPassed = false;
-  try {
-    const Tesseract = await import('tesseract.js');
-    const { data: { text } } = await Tesseract.default.recognize(idCardUrl, 'eng', {});
-    const extractedText = text.toUpperCase();
-    const nameParts = expectedName.toUpperCase().split(' ').filter((p: string) => p.length > 2);
-    const matchCount = nameParts.filter((part: string) => extractedText.includes(part)).length;
-    nameMatchPassed = matchCount >= Math.min(2, nameParts.length);
-  } catch (ocrError) {
-    // OCR failed — fall back to admin manual review
-    console.error('OCR failed, falling back to manual review:', ocrError);
-    nameMatchPassed = true;
-  }
-
-  if (!nameMatchPassed) {
-    return apiError(
-      `Name on ID card does not match "${expectedName}". Ensure your ID card matches your registered name exactly.`,
-      422,
-    );
-  }
+  // Manual-review mode: OCR is intentionally bypassed.
+  void expectedName;
 
   return apiSuccess({ message: 'ID submitted for admin review' });
 });
