@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase';
 import { getUserSafe } from '@/lib/auth';
 import { format, parseISO } from 'date-fns';
 import type { Order, User } from '@/types';
+import HamburgerThemePanel from '@/components/HamburgerThemePanel';
 
 interface AgentPayout {
   agent: User;
@@ -176,12 +177,23 @@ export default function AdminPage() {
     if (data.ok) setHealth(data);
   }
 
-  // Load tab data on demand
-  useEffect(() => {
-    if (activeTab === 'reports') loadReports();
-    if (activeTab === 'moderation') loadBans();
-    if (activeTab === 'health') loadHealth();
-  }, [activeTab]);
+  function handleTabChange(nextTab: typeof activeTab) {
+    setActiveTab(nextTab);
+
+    if (nextTab === 'reports') {
+      void loadReports();
+      return;
+    }
+
+    if (nextTab === 'moderation') {
+      void loadBans();
+      return;
+    }
+
+    if (nextTab === 'health') {
+      void loadHealth();
+    }
+  }
 
   async function updateReport(reportId: string, update: Record<string, unknown>) {
     setActionLoading(reportId);
@@ -351,6 +363,8 @@ export default function AdminPage() {
               <a href="/admin" className="mobile-menu-link active" onClick={() => setMenuOpen(false)}>
                 Dashboard
               </a>
+
+              <HamburgerThemePanel />
             </div>
             <div style={{ padding: '1.2rem 1.4rem', borderTop: '0.14rem solid #2a2a2a' }}>
               <button
@@ -392,7 +406,7 @@ export default function AdminPage() {
             <button
               key={t}
               className={`btn btn-sm ${activeTab === t ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => setActiveTab(t)}
+              onClick={() => handleTabChange(t)}
             >
               {t === 'orders' ? `Orders (${orders.length})` :
                t === 'agents' ? `Dashers (${agents.length})` :
@@ -429,7 +443,7 @@ export default function AdminPage() {
                 </thead>
                 <tbody>
                   {filteredOrders.map((o) => {
-                    const cust = (o as any).customer;
+                    const cust = o.customer;
                     const shortId = o.id.slice(-4).toUpperCase();
                     return (
                       <tr key={o.id}>

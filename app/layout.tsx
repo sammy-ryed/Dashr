@@ -1,10 +1,21 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
+import { Courier_Prime } from 'next/font/google';
+import ThemeBootstrap from '@/components/ThemeBootstrap';
+import { getThemeBootstrapScript } from '@/lib/theme-preferences';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://dashr.app';
+const courierPrime = Courier_Prime({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-courier-prime',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
+  applicationName: 'DASHR',
   title: {
     default: 'DASHR — Campus Delivery for SRM Students',
     template: '%s | DASHR',
@@ -65,6 +76,10 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
+  other: {
+    'msapplication-TileColor': '#0f0f0f',
+    'msapplication-config': '/browserconfig.xml',
+  },
 };
 
 export const viewport: Viewport = {
@@ -76,44 +91,25 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-scroll-behavior="smooth">
-      <head>
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="DASHR" />
-        <meta name="application-name" content="DASHR" />
-        <meta name="msapplication-TileColor" content="#0f0f0f" />
-        <meta name="msapplication-config" content="/browserconfig.xml" />
-        <link rel="manifest" href="/manifest.json" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="shortcut icon" type="image/png" href="/favicon-32x32.png" />
-        {/* Google Fonts — preload to avoid render block */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="preload"
-          as="style"
-          href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap"
-        />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap"
-        />
-
-        <script
-          async
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
+      <body className={courierPrime.variable}>
+        <Script
+          id="theme-bootstrap"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed:', err));
-              }
-            `,
+            __html: getThemeBootstrapScript(),
           }}
         />
-      </head>
-      <body>{children}</body>
+        <ThemeBootstrap />
+        {children}
+        <Script id="dashr-sw-register" strategy="afterInteractive">
+          {`if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/sw.js').catch(function () {});
+              });
+            }`}
+        </Script>
+      </body>
     </html>
   );
 }

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase';
 import { getUserSafe } from '@/lib/auth';
 import type { User } from '@/types';
 import NotificationBell from '@/components/NotificationBell';
+import HamburgerThemePanel from '@/components/HamburgerThemePanel';
 
 interface AgentShellProps {
   children: React.ReactNode;
@@ -370,6 +371,8 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
               >
                 Profile
               </Link>
+
+              <HamburgerThemePanel />
             </div>
 
             <div style={{ padding: '1.2rem 1.4rem', borderTop: '0.14rem solid #2a2a2a' }}>

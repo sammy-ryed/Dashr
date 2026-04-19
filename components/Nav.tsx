@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import NotificationBell from '@/components/NotificationBell';
+import HamburgerThemePanel from '@/components/HamburgerThemePanel';
 
 interface NavProps {
   role?: 'customer' | 'agent' | 'admin';
@@ -314,6 +315,8 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
                   <Link href="/refund-policy" className="type-mono" style={{ fontSize: '0.55rem', color: 'var(--muted)', textDecoration: 'none' }} onClick={() => setMenuOpen(false)}>Refunds</Link>
                 </div>
               </div>
+
+              <HamburgerThemePanel />
             </div>
 
             {/* Logout at bottom */}
@@ -348,7 +351,7 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
             <div className="about-scroll">
               {/* Origin story */}
               <div className="about-story">
-                <div className="about-story-label">// origin_story.txt</div>
+                <div className="about-story-label">{'// origin_story.txt'}</div>
                 <p className="about-story-text">
                   It started simple: we just wanted chips and shi from <span className="about-hl">Durga Samy</span> and the senior block shop delivered to the hostel.
                   Went to the shops, pitched the idea. Same answer every time: <span className="about-hl">no delivery guys</span>.

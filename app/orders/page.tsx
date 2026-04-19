@@ -124,7 +124,7 @@ export default function OrdersPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
             {filtered.map((order) => {
               const shortId = order.id.slice(-4).toUpperCase();
-              const agentInfo = order.agent as any;
+              const agentInfo = order.agent;
               const isActive = !['delivered', 'cancelled'].includes(order.status);
               return (
                 <Link href={`/order/${order.id}/status`} key={order.id} style={{ textDecoration: 'none', color: 'inherit' }}>

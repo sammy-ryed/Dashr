@@ -98,7 +98,7 @@ export default function AgentLedgerPage() {
                     <td colSpan={7}>── Week of {format(parseISO(week.weekStart), 'd MMM yyyy')} · Total: ₹{week.total} ──</td>
                   </tr>
                   {week.entries.map((entry) => {
-                    const order = entry.order as any;
+                    const order = entry.order;
                     return (
                       <tr key={entry.id}>
                         <td data-label="Order ID"><span className="type-mono" style={{ fontSize: '0.65rem' }}>#{(entry.order_id || '').slice(-4).toUpperCase()}</span></td>

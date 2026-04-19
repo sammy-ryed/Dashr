@@ -78,7 +78,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   z-index: 300;
-  background: var(--surface, #101010);
+  background: var(--surf);
   border: 0.14rem solid #2a2a2a;
   border-radius: 0.35rem;
   box-shadow:
@@ -220,7 +220,7 @@
 .notificationMessage {
   font-family: var(--mono);
   font-size: 0.64rem;
-  color: #d0d0d0;
+  color: var(--white);
   line-height: 1.4;
   margin-top: 0.4rem;
   word-break: break-word;

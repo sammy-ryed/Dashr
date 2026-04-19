@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { createClient } from '@/lib/supabase';
 import { REPORT_REASON_LABELS } from '@/types';
 import type { ReportReason } from '@/types';
 
@@ -22,16 +21,6 @@ export default function ReportModal({ isOpen, onClose, reportedId, reportedName,
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const backdropRef = useRef<HTMLDivElement>(null);
-
-  // Reset on open
-  useEffect(() => {
-    if (isOpen) {
-      setReason('');
-      setNotes('');
-      setError('');
-      setSuccess(false);
-    }
-  }, [isOpen]);
 
   // Close on Escape
   useEffect(() => {

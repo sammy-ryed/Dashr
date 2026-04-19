@@ -143,7 +143,7 @@ export default function BannedPage() {
           <div className="notice notice-y">
             <div style={{ fontWeight: 600, fontSize: '0.75rem', marginBottom: '0.3rem' }}>Appeal Submitted</div>
             <div style={{ fontSize: '0.68rem', lineHeight: 1.5 }}>
-              Your appeal is being reviewed. You'll receive a notification when there's an update. This usually takes 1–3 business days.
+              Your appeal is being reviewed. You&apos;ll receive a notification when there&apos;s an update. This usually takes 1–3 business days.
             </div>
           </div>
         ) : (
