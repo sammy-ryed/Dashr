@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Allow: /login
+Disallow: /admin
+Disallow: /agent/
+Disallow: /order/
+Disallow: /orders
+Disallow: /banned
+Disallow: /onboarding
+Disallow: /profile
+Disallow: /api/
+
+Sitemap: https://dashr.app/sitemap.xml

@@ -3,10 +3,18 @@ import { createAdminClient, createClient } from '@/lib/supabase-server';
 import { getUserSafe } from '@/lib/auth';
 import { apiError, apiSuccess, withErrorHandling } from '@/lib/api-helpers';
 import { sendTrackedEmail } from '@/lib/communication-policy';
+import { checkUserBan, isValidUUID } from '@/lib/moderation';
 
 type AllowedStatus = 'picked_up' | 'delivered';
 
 const ALLOWED_NEXT = new Set<AllowedStatus>(['picked_up', 'delivered']);
+
+function getWeekStart(): string {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff)).toISOString().split('T')[0];
+}
 
 export const POST = withErrorHandling(async (request: NextRequest) => {
   const { orderId, status } = (await request.json()) as {
@@ -14,7 +22,11 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     status?: AllowedStatus;
   };
 
-  if (!orderId || !status || !ALLOWED_NEXT.has(status)) {
+  if (!orderId || !isValidUUID(orderId)) {
+    return apiError('Valid orderId is required', 400);
+  }
+
+  if (!status || !ALLOWED_NEXT.has(status)) {
     return apiError('orderId and a valid status are required', 400);
   }
 
@@ -25,9 +37,16 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     return apiError('Unauthorized', 401);
   }
 
+  // Ban check
+  const adminClient = await createAdminClient();
+  const banCheck = await checkUserBan(adminClient, user.id);
+  if (banCheck.isBanned) {
+    return apiError('Your account is suspended', 403);
+  }
+
   const { data: order, error: orderError } = await authClient
     .from('orders')
-    .select('id, agent_id, customer_id, status, item_description, delivery_hostel')
+    .select('id, agent_id, customer_id, status, item_description, delivery_hostel, commission_amount')
     .eq('id', orderId)
     .single();
 
@@ -59,6 +78,20 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
 
   if (status === 'delivered') {
     const admin = await createAdminClient();
+
+    // Insert ledger entry server-side (safe — dasher cannot fake this)
+    await admin.from('ledger').insert({
+      agent_id: user.id,
+      order_id: orderId,
+      type: 'commission',
+      amount: order.commission_amount,
+      week_start: getWeekStart(),
+    });
+
+    // Atomically increment total_deliveries via DB RPC (prevents race conditions)
+    await admin.rpc('increment_deliveries', { user_id: user.id });
+
+    // Notify customer via email
     const { data: customer } = await admin
       .from('users')
       .select('email, name')
@@ -71,7 +104,7 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
         priority: 'critical',
         to: customer.email,
         orderId,
-        subject: 'DASHR order delivered successfully',
+        subject: 'Your DASHR order has been delivered',
         text: `Your order has been delivered successfully. Please open DASHR to review and rate the dasher.`,
         html: `
           <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111;">

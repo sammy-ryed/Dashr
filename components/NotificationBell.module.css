@@ -39,8 +39,7 @@
 }
 
 .label {
-  display: block;
-  letter-spacing: 0.05em;
+  display: none; /* replaced by SVG bell */
 }
 
 .badge {
@@ -71,14 +70,14 @@
 }
 
 .panel {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 0.6rem);
-  width: min(32rem, calc(90vw - 1rem));
+  position: fixed;
+  top: 4rem;
+  right: max(0.5rem, env(safe-area-inset-right, 0.5rem));
+  width: min(32rem, calc(100vw - 1rem));
   max-height: 70vh;
   overflow-y: auto;
   overflow-x: hidden;
-  z-index: 120;
+  z-index: 300;
   background: var(--surface, #101010);
   border: 0.14rem solid #2a2a2a;
   border-radius: 0.35rem;
@@ -251,48 +250,35 @@
   transform: scale(0.95);
 }
 
-/* Error state - fallback polling active */
-.errorDot {
-  position: absolute;
-  right: -0.3rem;
-  top: -0.3rem;
-  width: 0.8rem;
-  height: 0.8rem;
-  border-radius: 999px;
-  background: var(--orange, #ff8800);
-  border: 0.06rem solid var(--bg);
-  animation: errorPulse 2s ease-in-out infinite;
+/* Connection note — subtle, inside panel only */
+.connectionNote {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: rgba(160, 160, 160, 0.07);
+  border-bottom: 0.06rem solid #2a2a2a;
+  gap: 0.8rem;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: #888;
+  letter-spacing: 0.02em;
 }
 
-@keyframes errorPulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(255, 136, 0, 0.5);
-  }
-  50% {
-    box-shadow: 0 0 0 0.3rem rgba(255, 136, 0, 0);
-  }
-}
-
-.button[data-error="true"] {
-  border-color: var(--orange, #ff8800);
-  background: var(--surf2, #1a1a1a);
-}
-
-.button[data-error="true"]:hover {
-  box-shadow: 0 0 0.8rem rgba(255, 136, 0, 0.25);
-}
-
-.errorMsg {
-  display: inline-block;
-  padding: 0.3rem 0.6rem;
-  background: rgba(255, 136, 0, 0.1);
-  border: 0.08rem solid rgba(255, 136, 0, 0.3);
-  border-radius: 0.2rem;
-  color: var(--orange, #ff8800);
+.connectionNoteDismiss {
+  background: transparent;
+  border: none;
+  color: #666;
   font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  margin-left: 0.6rem;
+  cursor: pointer;
+  padding: 0 0.2rem;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.connectionNoteDismiss:hover {
+  color: var(--white);
 }
 
 /* Responsive adjustments */
@@ -304,8 +290,8 @@
   }
 
   .panel {
-    width: calc(90vw - 1rem);
-    max-height: 60vh;
+    top: 3.6rem;
+    max-height: 65vh;
   }
 
   .notificationHeader {

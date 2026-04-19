@@ -9,9 +9,10 @@ interface RatingModalProps {
   raterRole: 'customer' | 'dasher';
   onClose: () => void;
   onSubmitted?: () => void;
+  onReport?: () => void;  // optional: open the report modal directly
 }
 
-export default function RatingModal({ orderId, raterId, ratedName, raterRole, onClose, onSubmitted }: RatingModalProps) {
+export default function RatingModal({ orderId, raterId, ratedName, raterRole, onClose, onSubmitted, onReport }: RatingModalProps) {
   const [score, setScore] = useState(0);
   const [hoveredStar, setHoveredStar] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -100,6 +101,29 @@ export default function RatingModal({ orderId, raterId, ratedName, raterRole, on
                 {submitting ? <span className="spinner" style={{ width: '0.8rem', height: '0.8rem' }} /> : `Submit ${score > 0 ? `${score}★` : ''}`}
               </button>
             </div>
+
+            {/* Report option — only shown for dashers who want to report a non-paying customer */}
+            {onReport && (
+              <div style={{ marginTop: '0.8rem', textAlign: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => { onClose(); onReport(); }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    fontFamily: 'var(--mono)',
+                    fontSize: '0.58rem',
+                    color: 'var(--muted)',
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Report an issue instead
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

@@ -41,15 +41,35 @@ export default function OrderPage() {
     async function init() {
       const authUser = await getUserSafe(supabase);
       if (authUser) {
-        const { data: profile } = await supabase.from('users').select('name, role').eq('id', authUser.id).single();
-        const p = profile as { name: string; role: string } | null;
-        if (p) setUser({ id: authUser.id, name: p.name || '', role: p.role });
+        const { data: profile } = await supabase.from('users').select('name, role, is_banned').eq('id', authUser.id).single();
+        const p = profile as { name: string; role: string; is_banned: boolean } | null;
+        if (p) {
+          // Redirect banned users before they see the form
+          if (p.is_banned) { router.push('/banned'); return; }
+          setUser({ id: authUser.id, name: p.name || '', role: p.role });
+        }
       }
       const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'agent').eq('is_online', true);
       setOnlineCount(count || 0);
       setAuthLoading(false);
     }
     init();
+
+    // Subscribe to online status changes
+    const channel = supabase
+      .channel('agent-online-status')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'users',
+        filter: 'role=eq.agent',
+      }, async () => {
+        const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'agent').eq('is_online', true);
+        setOnlineCount(count || 0);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -337,6 +357,16 @@ export default function OrderPage() {
               </div>
               {commError && <div className="comm-err">{commError}</div>}
               <div className="comm-hint">MIN ₹{minComm} for {ZONE_LABELS[zone]} · Higher = faster pickup</div>
+            </div>
+
+            <div className="phone-notice">
+              <div className="phone-notice-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.59a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"/></svg>
+              </div>
+              <div>
+                <strong>Direct coordination</strong> — Your phone number will be shared with your dasher so they
+                can reach you during delivery. Keeps things fast and personal, no middleman.
+              </div>
             </div>
 
             <button className="btn btn-primary btn-lg btn-block" id="order-submit" onClick={placeOrder} disabled={loading || !user}>

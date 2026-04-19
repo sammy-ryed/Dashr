@@ -57,7 +57,7 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
     init();
   }, []);
 
-  // Session management: 16hr auto-logout + 5hr auto-offline
+  // Session management: 16hr auto-logout + 5hr auto-offline + periodic ban check
   useEffect(() => {
     if (!agent) return;
 
@@ -66,6 +66,7 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
     const ACTIVITY_KEY = 'dashr_last_activity';
     const SESSION_MAX_MS = 16 * 60 * 60 * 1000; // 16 hours
     const INACTIVE_MAX_MS = 5 * 60 * 60 * 1000;  // 5 hours
+    const BAN_CHECK_INTERVAL = 5 * 60 * 1000;     // 5 minutes
 
     // Set session start if not set
     if (!localStorage.getItem(SESSION_KEY)) {
@@ -82,6 +83,8 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
     window.addEventListener('keydown', updateActivity);
     window.addEventListener('scroll', updateActivity);
     window.addEventListener('touchstart', updateActivity);
+
+    let lastBanCheck = Date.now();
 
     // Check every 60 seconds
     const interval = setInterval(async () => {
@@ -104,6 +107,20 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
         await supabase.from('users').update({ is_online: false }).eq('id', agent.id);
         setAgent((prev) => prev ? { ...prev, is_online: false } : null);
       }
+
+      // Periodic ban check every 5 minutes
+      if (now - lastBanCheck >= BAN_CHECK_INTERVAL) {
+        lastBanCheck = now;
+        const { data: profile } = await supabase
+          .from('users')
+          .select('is_banned')
+          .eq('id', agent.id)
+          .single();
+        if (profile?.is_banned) {
+          await supabase.from('users').update({ is_online: false }).eq('id', agent.id);
+          router.push('/banned');
+        }
+      }
     }, 60_000);
 
     return () => {
@@ -120,14 +137,56 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
     if (typeof window === 'undefined') return;
 
     lastScrollYRef.current = window.scrollY;
-    const SCROLL_DELTA_THRESHOLD = 8;
+    const SCROLL_DELTA_THRESHOLD = 20;
     const TOP_SAFE_ZONE = 24;
+
+    let focusScrollLock = false;
+    let clickScrollLock = false;
+    let focusTimer: ReturnType<typeof setTimeout>;
+    let clickTimer: ReturnType<typeof setTimeout>;
+
+    function isFormElement(el: Element | null): boolean {
+      if (!el) return false;
+      const tag = el.tagName.toLowerCase();
+      return ['input', 'textarea', 'select', 'button'].includes(tag);
+    }
+
+    function onFocus() {
+      focusScrollLock = true;
+      clearTimeout(focusTimer);
+      focusTimer = setTimeout(() => { focusScrollLock = false; }, 300);
+    }
+
+    function onBlur() {
+      focusScrollLock = true;
+      clearTimeout(focusTimer);
+      focusTimer = setTimeout(() => { focusScrollLock = false; }, 300);
+    }
+
+    function onClick() {
+      clickScrollLock = true;
+      clearTimeout(clickTimer);
+      clickTimer = setTimeout(() => { clickScrollLock = false; }, 150);
+    }
 
     function onScroll() {
       const currentY = window.scrollY;
       const delta = currentY - lastScrollYRef.current;
 
-      if (Math.abs(delta) < SCROLL_DELTA_THRESHOLD) return;
+      if (Math.abs(delta) < SCROLL_DELTA_THRESHOLD) {
+        lastScrollYRef.current = currentY;
+        return;
+      }
+
+      if (isFormElement(document.activeElement)) {
+        lastScrollYRef.current = currentY;
+        return;
+      }
+
+      if (focusScrollLock || clickScrollLock) {
+        lastScrollYRef.current = currentY;
+        return;
+      }
 
       if (currentY <= TOP_SAFE_ZONE || menuOpen) {
         setNavHidden(false);
@@ -141,7 +200,18 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
     }
 
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    document.addEventListener('focusin', onFocus, true);
+    document.addEventListener('focusout', onBlur, true);
+    document.addEventListener('click', onClick, true);
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      document.removeEventListener('focusin', onFocus, true);
+      document.removeEventListener('focusout', onBlur, true);
+      document.removeEventListener('click', onClick, true);
+      clearTimeout(focusTimer);
+      clearTimeout(clickTimer);
+    };
   }, [menuOpen]);
 
   async function toggleOnline() {
@@ -211,14 +281,16 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
             <NotificationBell />
           </div>
 
-          {/* Online/offline status */}
-          <button
-            className="nav-cta"
-            onClick={toggleOnline}
-            style={{ background: agent?.is_online ? 'var(--green)' : 'var(--yellow)' }}
-          >
-            {agent?.is_online ? '● Online' : 'Go Online'}
-          </button>
+          {/* Online/offline status — only show after load */}
+          {!loading && (
+            <button
+              className="nav-cta"
+              onClick={toggleOnline}
+              style={{ background: agent?.is_online ? 'var(--green)' : 'var(--yellow)' }}
+            >
+              {agent?.is_online ? '● Online' : 'Go Online'}
+            </button>
+          )}
 
           {/* Hamburger */}
           <button

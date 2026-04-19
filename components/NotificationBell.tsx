@@ -7,7 +7,8 @@ import type { NotificationItem } from '@/types';
 import styles from './NotificationBell.module.css';
 
 const MAX_NOTIFICATIONS = 20;
-const FALLBACK_POLL_INTERVAL = 30_000; // 30 seconds if realtime fails
+const FALLBACK_POLL_INTERVAL = 30_000;  // 30s if realtime fails
+const REALTIME_RETRY_INTERVAL = 60_000; // retry reconnect every 60s
 
 function timeAgo(iso: string) {
   const ms = Date.now() - new Date(iso).getTime();
@@ -19,17 +20,39 @@ function timeAgo(iso: string) {
   return `${days}d ago`;
 }
 
+// SVG Bell Icon — no dependencies
+function BellIcon({ hasUnread }: { hasUnread: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={hasUnread ? 2.2 : 1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+
 export default function NotificationBell() {
   const supabase = createClient();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const fallbackPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [userId, setUserId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState(false);
+  const [connectionNoteDismissed, setConnectionNoteDismissed] = useState(false);
 
   const loadForUser = useCallback(async (targetUserId: string) => {
     try {
@@ -77,73 +100,96 @@ export default function NotificationBell() {
     };
   }, [loadForUser, supabase]);
 
-  // Realtime subscription with error handling and fallback
+  // Realtime subscription with error handling, fallback, and auto-retry
   useEffect(() => {
     if (!userId) return;
 
     let isActive = true;
 
-    const channel = supabase
-      .channel(`notifications-${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`,
-        },
-        () => {
-          if (isActive && userId) {
-            loadForUser(userId);
-          }
-        },
-      )
-      .subscribe(
-        async (status: string) => {
-          if (!isActive) return;
+    function activateFallback() {
+      if (!fallbackPollRef.current) {
+        fallbackPollRef.current = setInterval(() => {
+          if (isActive && userId) loadForUser(userId);
+        }, FALLBACK_POLL_INTERVAL);
+      }
+    }
 
-          if (status === 'SUBSCRIBED') {
-            setSubscriptionError(false);
-            // Clear any fallback polling since realtime is working
-            if (fallbackPollRef.current) {
-              clearInterval(fallbackPollRef.current);
-              fallbackPollRef.current = null;
-            }
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            setSubscriptionError(true);
-            // Activate fallback polling only once
-            if (!fallbackPollRef.current) {
-              fallbackPollRef.current = setInterval(() => {
-                if (isActive && userId) {
-                  loadForUser(userId);
-                }
-              }, FALLBACK_POLL_INTERVAL);
-            }
-          }
-        },
-        () => {
+    function scheduleRetry(channelRef: ReturnType<typeof supabase.channel>) {
+      if (!retryTimeoutRef.current) {
+        retryTimeoutRef.current = setTimeout(() => {
+          retryTimeoutRef.current = null;
           if (!isActive) return;
-          setSubscriptionError(true);
-          // Activate fallback polling on subscription error
-          if (!fallbackPollRef.current) {
-            fallbackPollRef.current = setInterval(() => {
-              if (isActive && userId) {
-                loadForUser(userId);
+          supabase.removeChannel(channelRef);
+          // Re-create subscription
+          const newChannel = buildChannel();
+          subscriptionRef.current = newChannel;
+        }, REALTIME_RETRY_INTERVAL);
+      }
+    }
+
+    function buildChannel() {
+      const ch = supabase
+        .channel(`notifications-${userId}-${Date.now()}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`,
+          },
+          () => {
+            if (isActive && userId) loadForUser(userId);
+          },
+        )
+        .subscribe(
+          async (status: string) => {
+            if (!isActive) return;
+
+            if (status === 'SUBSCRIBED') {
+              setSubscriptionError(false);
+              setConnectionNoteDismissed(false);
+              if (fallbackPollRef.current) {
+                clearInterval(fallbackPollRef.current);
+                fallbackPollRef.current = null;
               }
-            }, FALLBACK_POLL_INTERVAL);
-          }
-        },
-      );
+              if (retryTimeoutRef.current) {
+                clearTimeout(retryTimeoutRef.current);
+                retryTimeoutRef.current = null;
+              }
+            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              setSubscriptionError(true);
+              activateFallback();
+              scheduleRetry(ch);
+            }
+          },
+          () => {
+            if (!isActive) return;
+            setSubscriptionError(true);
+            activateFallback();
+            scheduleRetry(ch);
+          },
+        );
 
+      return ch;
+    }
+
+    const channel = buildChannel();
     subscriptionRef.current = channel;
 
     return () => {
       isActive = false;
       supabase.removeChannel(channel);
+      if (subscriptionRef.current && subscriptionRef.current !== channel) {
+        supabase.removeChannel(subscriptionRef.current);
+      }
       if (fallbackPollRef.current) {
         clearInterval(fallbackPollRef.current);
         fallbackPollRef.current = null;
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
       }
     };
   }, [loadForUser, userId, supabase]);
@@ -189,7 +235,9 @@ export default function NotificationBell() {
         .update({ is_read: true })
         .eq('id', notificationId);
 
-      setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n)));
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n)),
+      );
     } catch (err) {
       console.error('[NotificationBell] Error marking one as read:', err);
     }
@@ -199,25 +247,23 @@ export default function NotificationBell() {
     return null;
   }
 
+  const showConnectionNote = subscriptionError && !connectionNoteDismissed;
+
   return (
     <div ref={rootRef} className={styles.container}>
+      {/* Bell button — no alarming error indicator outside the panel */}
       <button
         type="button"
         onClick={() => setOpen((s) => !s)}
-        aria-label="Notifications"
-        className={styles.button}
-        title={
-          subscriptionError
-            ? 'Notifications (connection issue, using fallback)'
-            : unreadCount > 0
-              ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}`
-              : 'Notifications'
+        aria-label={
+          unreadCount > 0
+            ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}`
+            : 'Notifications'
         }
-        data-error={subscriptionError ? 'true' : undefined}
+        className={styles.button}
       >
-        <span className={styles.label}>NOTIF</span>
-        {subscriptionError && <span className={styles.errorDot} aria-label="Connection issue" />}
-        {unreadCount > 0 && !subscriptionError && (
+        <BellIcon hasUnread={unreadCount > 0} />
+        {unreadCount > 0 && (
           <span className={styles.badge} aria-label={`${unreadCount} unread`}>
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
@@ -228,11 +274,6 @@ export default function NotificationBell() {
         <div className={styles.panel}>
           <div className={styles.header}>
             <span className={styles.title}>Notifications</span>
-            {subscriptionError && (
-              <span className={styles.errorMsg} title="Using fallback polling every 30 seconds">
-                Connection issue
-              </span>
-            )}
             <button
               type="button"
               onClick={markAllRead}
@@ -242,6 +283,21 @@ export default function NotificationBell() {
               Mark all read
             </button>
           </div>
+
+          {/* Subtle connection info bar — inside panel only, dismissible */}
+          {showConnectionNote && (
+            <div className={styles.connectionNote}>
+              <span>Updates may be slightly delayed. Reconnecting…</span>
+              <button
+                type="button"
+                className={styles.connectionNoteDismiss}
+                onClick={() => setConnectionNoteDismissed(true)}
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {notifications.length === 0 ? (
             <div className={styles.empty}>No notifications yet.</div>
@@ -256,9 +312,7 @@ export default function NotificationBell() {
                     <div className={styles.notificationTitle}>{n.title}</div>
                     <div className={styles.notificationTime}>{timeAgo(n.created_at)}</div>
                   </div>
-                  <div className={styles.notificationMessage}>
-                    {n.message}
-                  </div>
+                  <div className={styles.notificationMessage}>{n.message}</div>
 
                   {!n.is_read && (
                     <button

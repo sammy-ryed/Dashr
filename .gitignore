@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# tesseract model — downloaded at runtime, not needed in repo
+eng.traineddata
+
+# dev-only files
+dashr-design-system.html
+gottawork.md
+help.txt
+CLAUDE.md

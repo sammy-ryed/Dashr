@@ -67,8 +67,12 @@ function LoginContent() {
     const user = await getUserSafe(supabase);
     if (!user) { router.push('/onboarding'); return; }
 
-    const { data: profile } = await supabase.from('users').select('role, name').eq('id', user.id).single();
+    const { data: profile } = await supabase.from('users').select('role, name, is_banned').eq('id', user.id).single();
     if (!profile?.name) { router.push('/onboarding'); return; }
+
+    // Ban check — redirect suspended users
+    if (profile.is_banned) { router.push('/banned'); return; }
+
     if (profile.role === 'admin') router.push('/admin');
     else if (profile.role === 'agent') router.push('/agent/dashboard');
     else router.push('/order');
@@ -103,8 +107,8 @@ function LoginContent() {
 
   // ── SIGN UP: Create Account ──────────────────────────────────
   async function createAccount() {
-    if (!password || password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!password || password.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
     setLoading(true);
@@ -154,8 +158,8 @@ function LoginContent() {
   // ── FORGOT: Verify + Reset ───────────────────────────────────
   async function resetPassword() {
     if (otp.length < 6) return;
-    if (!newPassword || newPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!newPassword || newPassword.length < 8) {
+      setError('Password must be at least 8 characters');
       return;
     }
     setLoading(true);
@@ -330,7 +334,7 @@ function LoginContent() {
                         className="inp"
                         id="signup-password"
                         type="password"
-                        placeholder="Minimum 6 characters"
+                        placeholder="Minimum 8 characters"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && createAccount()}
@@ -340,7 +344,7 @@ function LoginContent() {
                     <button
                       className="btn btn-primary btn-lg btn-block"
                       onClick={createAccount}
-                      disabled={loading || password.length < 6}
+                      disabled={loading || password.length < 8}
                     >
                       {loading ? <span className="spinner" /> : 'Create Account'}
                     </button>
@@ -412,7 +416,7 @@ function LoginContent() {
                         className="inp"
                         id="forgot-newpw"
                         type="password"
-                        placeholder="Minimum 6 characters"
+                        placeholder="Minimum 8 characters"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && resetPassword()}
@@ -421,7 +425,7 @@ function LoginContent() {
                     <button
                       className="btn btn-primary btn-lg btn-block"
                       onClick={resetPassword}
-                      disabled={loading || otp.length < 6 || newPassword.length < 6}
+                      disabled={loading || otp.length < 6 || newPassword.length < 8}
                     >
                       {loading ? <span className="spinner" /> : 'Reset Password'}
                     </button>

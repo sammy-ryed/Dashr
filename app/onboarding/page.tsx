@@ -23,6 +23,7 @@ function OnboardingContent() {
   const [idFile, setIdFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [policyAccepted, setPolicyAccepted] = useState(false);
 
   if (isPending) {
     return (
@@ -45,6 +46,7 @@ function OnboardingContent() {
       setError('Enter a valid 10-digit phone number');
       return;
     }
+    if (!policyAccepted) { setError('You must accept the policies to continue'); return; }
     setLoading(true);
     setError('');
 
@@ -58,6 +60,8 @@ function OnboardingContent() {
       email: user.email,
       role,
       is_verified: role === 'customer',
+      accepted_policy_version: '1.0',
+      accepted_policy_at: new Date().toISOString(),
     });
 
     if (upsertError) { setError(upsertError.message); setLoading(false); return; }
@@ -142,7 +146,22 @@ function OnboardingContent() {
               </div>
             </div>
 
-            <button className="btn btn-primary btn-lg btn-block" id="onboard-submit" onClick={submitBasic} disabled={loading}>
+            <label className="policy-check">
+              <input
+                type="checkbox"
+                checked={policyAccepted}
+                onChange={(e) => setPolicyAccepted(e.target.checked)}
+                id="policy-checkbox"
+              />
+              <span className="policy-check-text">
+                I agree to the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>,{' '}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>, and{' '}
+                <a href="/refund-policy" target="_blank" rel="noopener noreferrer">Refund Policy</a>.
+                I understand that my phone number will be shared with dashers for delivery coordination.
+              </span>
+            </label>
+
+            <button className="btn btn-primary btn-lg btn-block" id="onboard-submit" onClick={submitBasic} disabled={loading || !policyAccepted}>
               {loading ? <span className="spinner" /> : role === 'agent' ? 'Next: Verify ID' : 'Start Ordering'}
             </button>
           </>

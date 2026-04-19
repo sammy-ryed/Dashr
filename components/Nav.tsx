@@ -49,14 +49,60 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
     if (typeof window === 'undefined') return;
 
     lastScrollYRef.current = window.scrollY;
-    const SCROLL_DELTA_THRESHOLD = 8;
+    const SCROLL_DELTA_THRESHOLD = 20; // increased to ignore tiny focus-induced shifts
     const TOP_SAFE_ZONE = 24;
+
+    let focusScrollLock = false;  // true for 300ms after focus events
+    let clickScrollLock = false;  // true for 150ms after click events
+    let focusTimer: ReturnType<typeof setTimeout>;
+    let clickTimer: ReturnType<typeof setTimeout>;
+
+    function isFormElement(el: Element | null): boolean {
+      if (!el) return false;
+      const tag = el.tagName.toLowerCase();
+      return ['input', 'textarea', 'select', 'button'].includes(tag);
+    }
+
+    function onFocus() {
+      focusScrollLock = true;
+      clearTimeout(focusTimer);
+      focusTimer = setTimeout(() => { focusScrollLock = false; }, 300);
+    }
+
+    function onBlur() {
+      // Keep locked a bit after blur too (keyboard close bounce)
+      focusScrollLock = true;
+      clearTimeout(focusTimer);
+      focusTimer = setTimeout(() => { focusScrollLock = false; }, 300);
+    }
+
+    function onClick() {
+      clickScrollLock = true;
+      clearTimeout(clickTimer);
+      clickTimer = setTimeout(() => { clickScrollLock = false; }, 150);
+    }
 
     function onScroll() {
       const currentY = window.scrollY;
       const delta = currentY - lastScrollYRef.current;
 
-      if (Math.abs(delta) < SCROLL_DELTA_THRESHOLD) return;
+      // Always update baseline — prevents delta accumulation
+      if (Math.abs(delta) < SCROLL_DELTA_THRESHOLD) {
+        lastScrollYRef.current = currentY;
+        return;
+      }
+
+      // Lock nav visible if any form element is focused
+      if (isFormElement(document.activeElement)) {
+        lastScrollYRef.current = currentY;
+        return;
+      }
+
+      // Lock nav visible during focus/click transitions
+      if (focusScrollLock || clickScrollLock) {
+        lastScrollYRef.current = currentY;
+        return;
+      }
 
       if (currentY <= TOP_SAFE_ZONE || menuOpen) {
         setNavHidden(false);
@@ -70,7 +116,18 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
     }
 
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    document.addEventListener('focusin', onFocus, true);
+    document.addEventListener('focusout', onBlur, true);
+    document.addEventListener('click', onClick, true);
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      document.removeEventListener('focusin', onFocus, true);
+      document.removeEventListener('focusout', onBlur, true);
+      document.removeEventListener('click', onClick, true);
+      clearTimeout(focusTimer);
+      clearTimeout(clickTimer);
+    };
   }, [menuOpen]);
 
   async function handleLogout() {
@@ -171,9 +228,9 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
             )}
           </div>
 
-          {/* Mobile hamburger */}
+          {/* Mobile hamburger — always show */}
           <button
-            className="hamburger"
+            className="hamburger hamburger-always"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle menu"
           >
@@ -237,6 +294,15 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
                   Profile
                 </Link>
               )}
+
+              {/* Legal links */}
+              <div style={{ padding: '0.6rem 1.4rem', borderTop: '0.12rem solid #2a2a2a', marginTop: '0.4rem' }}>
+                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                  <Link href="/terms" className="type-mono" style={{ fontSize: '0.55rem', color: 'var(--muted)', textDecoration: 'none' }} onClick={() => setMenuOpen(false)}>Terms</Link>
+                  <Link href="/privacy" className="type-mono" style={{ fontSize: '0.55rem', color: 'var(--muted)', textDecoration: 'none' }} onClick={() => setMenuOpen(false)}>Privacy</Link>
+                  <Link href="/refund-policy" className="type-mono" style={{ fontSize: '0.55rem', color: 'var(--muted)', textDecoration: 'none' }} onClick={() => setMenuOpen(false)}>Refunds</Link>
+                </div>
+              </div>
             </div>
 
             {/* Logout at bottom */}

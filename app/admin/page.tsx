@@ -14,6 +14,45 @@ interface AgentPayout {
   deliveryCount: number;
 }
 
+interface Report {
+  id: string;
+  reason: string;
+  notes: string;
+  status: string;
+  severity: string | null;
+  admin_notes: string | null;
+  created_at: string;
+  reporter: { id: string; name: string; email: string } | null;
+  reported: { id: string; name: string; email: string; role: string } | null;
+}
+
+interface Ban {
+  id: string;
+  ban_type: string;
+  reason: string;
+  expires_at: string | null;
+  created_at: string;
+  user: { id: string; name: string; email: string; role: string } | null;
+  admin: { id: string; name: string } | null;
+}
+
+interface Appeal {
+  id: string;
+  appeal_text: string;
+  status: string;
+  admin_response: string | null;
+  created_at: string;
+  ban_id: string;
+  user_id: string;
+}
+
+interface HealthData {
+  orders: { last24h: number; lastHour: number };
+  users: { onlineNow: number };
+  emails: { sentLast24h: number; deliveredLast24h: number; failedLast24h: number; deliveryRate: number };
+  moderation: { pendingReports: number; activeBans: number; pendingAppeals: number };
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -21,13 +60,29 @@ export default function AdminPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [agents, setAgents] = useState<User[]>([]);
   const [payouts, setPayouts] = useState<AgentPayout[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [bans, setBans] = useState<Ban[]>([]);
+  const [appeals, setAppeals] = useState<Appeal[]>([]);
+  const [health, setHealth] = useState<HealthData | null>(null);
   const [stats, setStats] = useState({ ordersToday: 0, activeAgents: 0, pendingPayouts: 0 });
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'orders' | 'agents' | 'payouts'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'agents' | 'payouts' | 'reports' | 'moderation' | 'health'>('orders');
   const [statusFilter, setStatusFilter] = useState('all');
   const [strikeReason, setStrikeReason] = useState('');
   const [strikingAgent, setStrikingAgent] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState('');
+  const [adminNotes, setAdminNotes] = useState('');
+  const [editingNotes, setEditingNotes] = useState<string | null>(null);
+  const [banForm, setBanForm] = useState<{ userId: string; reportId: string } | null>(null);
+  const [banReason, setBanReason] = useState('');
+  const [banDuration, setBanDuration] = useState('7d');
+  const [directBanAgent, setDirectBanAgent] = useState<string | null>(null);
+  const [directBanReason, setDirectBanReason] = useState('');
+  const [directBanDuration, setDirectBanDuration] = useState('7d');
+  const [unbanReason, setUnbanReason] = useState('');
+  const [unbanningId, setUnbanningId] = useState<string | null>(null);
+  const [appealResponse, setAppealResponse] = useState('');
+  const [reviewingAppeal, setReviewingAppeal] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -96,6 +151,121 @@ export default function AdminPage() {
     }
     setStrikingAgent(null);
     setStrikeReason('');
+    setActionLoading('');
+  }
+
+  async function loadReports() {
+    const res = await fetch('/api/admin/reports?limit=100');
+    const data = await res.json();
+    if (data.ok) setReports(data.reports || []);
+  }
+
+  async function loadBans() {
+    const res = await fetch('/api/admin/bans?active=true');
+    const data = await res.json();
+    if (data.ok) setBans(data.bans || []);
+    // Also load pending appeals
+    const appealRes = await fetch('/api/admin/appeals?status=pending');
+    const appealData = await appealRes.json();
+    if (appealData.ok) setAppeals(appealData.appeals || []);
+  }
+
+  async function loadHealth() {
+    const res = await fetch('/api/admin/health');
+    const data = await res.json();
+    if (data.ok) setHealth(data);
+  }
+
+  // Load tab data on demand
+  useEffect(() => {
+    if (activeTab === 'reports') loadReports();
+    if (activeTab === 'moderation') loadBans();
+    if (activeTab === 'health') loadHealth();
+  }, [activeTab]);
+
+  async function updateReport(reportId: string, update: Record<string, unknown>) {
+    setActionLoading(reportId);
+    const res = await fetch('/api/admin/reports', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reportId, ...update }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setReports((prev) => prev.map((r) =>
+        r.id === reportId ? { ...r, ...update, status: (update.status as string) || r.status } : r
+      ));
+    }
+    setActionLoading('');
+  }
+
+  async function banUser(userId: string, reportId: string) {
+    if (!banReason.trim()) return;
+    setActionLoading(userId);
+    const res = await fetch('/api/admin/bans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, banType: 'temporary', reason: banReason, duration: banDuration, relatedReportId: reportId }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setBanForm(null);
+      setBanReason('');
+      loadReports();
+      loadBans();
+    }
+    setActionLoading('');
+  }
+
+  async function banUserDirect(userId: string) {
+    if (!directBanReason.trim()) return;
+    setActionLoading(userId);
+    const res = await fetch('/api/admin/bans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, banType: 'temporary', reason: directBanReason, duration: directBanDuration }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setDirectBanAgent(null);
+      setDirectBanReason('');
+      setAgents((prev) => prev.map((a) => a.id === userId ? { ...a, is_banned: true, is_online: false } : a));
+    }
+    setActionLoading('');
+  }
+
+  async function unbanUser(banId: string) {
+    if (!unbanReason.trim()) return;
+    setActionLoading(banId);
+    const res = await fetch('/api/admin/bans', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ banId, reason: unbanReason }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setBans((prev) => prev.filter((b) => b.id !== banId));
+      setUnbanningId(null);
+      setUnbanReason('');
+    }
+    setActionLoading('');
+  }
+
+  async function reviewAppeal(appealId: string, approve: boolean) {
+    if (!appealResponse.trim()) return;
+    setActionLoading(appealId);
+    const res = await fetch('/api/admin/appeals', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ appealId, decision: approve ? 'approved' : 'denied', adminResponse: appealResponse }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setAppeals((prev) => prev.filter((a) => a.id !== appealId));
+      setReviewingAppeal(null);
+      setAppealResponse('');
+      if (approve) loadBans();
+    }
     setActionLoading('');
   }
 
@@ -217,14 +387,18 @@ export default function AdminPage() {
 
       <div className="page-enter" style={{ padding: '2rem clamp(1rem,5vw,4rem)' }}>
         {/* Tabs */}
-        <div className="flex-row" style={{ marginBottom: '2rem' }}>
-          {(['orders', 'agents', 'payouts'] as const).map((t) => (
+        <div className="flex-row" style={{ marginBottom: '2rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          {(['orders', 'agents', 'payouts', 'reports', 'moderation', 'health'] as const).map((t) => (
             <button
               key={t}
               className={`btn btn-sm ${activeTab === t ? 'btn-primary' : 'btn-ghost'}`}
               onClick={() => setActiveTab(t)}
             >
-              {t === 'orders' ? `Orders (${orders.length})` : t === 'agents' ? `Dashers (${agents.length})` : `Payouts (${payouts.length})`}
+              {t === 'orders' ? `Orders (${orders.length})` :
+               t === 'agents' ? `Dashers (${agents.length})` :
+               t === 'payouts' ? `Payouts (${payouts.length})` :
+               t === 'reports' ? 'Reports' :
+               t === 'moderation' ? 'Moderation' : 'Health'}
             </button>
           ))}
         </div>
@@ -338,6 +512,47 @@ export default function AdminPage() {
                       <button className="btn btn-sm btn-danger" onClick={() => setStrikingAgent(agent.id)}>Add Strike</button>
                     )
                   )}
+                  {/* Direct Ban from agents tab */}
+                  {directBanAgent === agent.id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', alignItems: 'flex-end' }}>
+                      <input
+                        className="inp"
+                        style={{ fontSize: '0.6rem', padding: '0.25em 0.4em', width: '12rem' }}
+                        placeholder="Ban reason..."
+                        value={directBanReason}
+                        onChange={(e) => setDirectBanReason(e.target.value)}
+                      />
+                      <select
+                        className="inp"
+                        style={{ fontSize: '0.58rem', padding: '0.2em 0.4em', width: '12rem' }}
+                        value={directBanDuration}
+                        onChange={(e) => setDirectBanDuration(e.target.value)}
+                      >
+                        <option value="7d">7 days</option>
+                        <option value="14d">14 days</option>
+                        <option value="30d">30 days</option>
+                        <option value="permanent">Permanent</option>
+                      </select>
+                      <div style={{ display: 'flex', gap: '0.3rem' }}>
+                        <button className="btn btn-sm btn-ghost" onClick={() => { setDirectBanAgent(null); setDirectBanReason(''); }}>Cancel</button>
+                        <button
+                          className="btn btn-sm btn-danger"
+                          onClick={() => banUserDirect(agent.id)}
+                          disabled={!directBanReason || actionLoading === agent.id}
+                        >
+                          {actionLoading === agent.id ? <span className="spinner" style={{ width: '0.8rem', height: '0.8rem' }} /> : 'Confirm Ban'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="btn btn-sm btn-danger"
+                      style={{ fontSize: '0.58rem', opacity: 0.7 }}
+                      onClick={() => { setDirectBanAgent(agent.id); setStrikingAgent(null); }}
+                    >
+                      Ban User
+                    </button>
+                  )}
                   {!agent.is_verified && (
                     <button
                       className="btn btn-sm btn-ghost"
@@ -349,7 +564,7 @@ export default function AdminPage() {
                         setActionLoading('');
                       }}
                     >
-                      ✓ Approve
+                      Approve
                     </button>
                   )}
                 </div>
@@ -387,6 +602,182 @@ export default function AdminPage() {
                   ))}
                 </tbody>
               </table>
+            )}
+          </div>
+        )}
+
+        {/* REPORTS TAB */}
+        {activeTab === 'reports' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {reports.length === 0 ? (
+              <div className="notice notice-g">No reports found ✓</div>
+            ) : reports.map((report) => (
+              <div key={report.id} className="agent-card" style={{ flexDirection: 'column', gap: '0.8rem', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div>
+                    <div className="type-label" style={{ fontSize: '0.6rem', color: 'var(--muted)', marginBottom: '0.2rem' }}>
+                      {report.reporter?.name || '?'} → {report.reported?.name || '?'}
+                    </div>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase' }}>
+                      {report.reason.replace('_', ' ')}
+                    </div>
+                    {report.notes && <div style={{ fontSize: '0.62rem', color: '#ccc', marginTop: '0.2rem', maxWidth: '28rem' }}>{report.notes}</div>}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
+                    <span className={`badge ${
+                      report.status === 'pending' ? 'badge-y' :
+                      report.status === 'reviewing' ? 'badge-b' :
+                      report.status === 'resolved' ? 'badge-gf' : 'badge-mut'
+                    }`} style={{ fontSize: '0.5rem' }}>{report.status}</span>
+                    {report.severity && <span className={`badge ${
+                      report.severity === 'critical' ? 'badge-r' :
+                      report.severity === 'high' ? 'badge-o' :
+                      report.severity === 'medium' ? 'badge-y' : 'badge-mut'
+                    }`} style={{ fontSize: '0.5rem' }}>{report.severity}</span>}
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: '0.52rem', color: 'var(--muted)' }}>
+                      {format(parseISO(report.created_at), 'd MMM HH:mm')}
+                    </div>
+                  </div>
+                </div>
+
+                {report.admin_notes && (
+                  <div style={{ fontSize: '0.62rem', color: 'var(--yellow)', borderLeft: '0.1rem solid var(--yellow)', paddingLeft: '0.6rem' }}>
+                    Note: {report.admin_notes}
+                  </div>
+                )}
+
+                {/* Actions */}
+                {!['resolved', 'dismissed'].includes(report.status) && (
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button className="btn btn-sm btn-ghost" onClick={() => updateReport(report.id, { status: 'reviewing' })} disabled={actionLoading === report.id}>Review</button>
+                    <button className="btn btn-sm btn-ghost" onClick={() => updateReport(report.id, { status: 'resolved' })} disabled={actionLoading === report.id}>Resolve</button>
+                    <button className="btn btn-sm btn-ghost" onClick={() => updateReport(report.id, { status: 'dismissed' })} disabled={actionLoading === report.id}>Dismiss</button>
+                    <select
+                      className="inp"
+                      style={{ fontSize: '0.58rem', padding: '0.2em 0.4em', height: 'auto' }}
+                      defaultValue=""
+                      onChange={(e) => e.target.value && updateReport(report.id, { severity: e.target.value })}
+                    >
+                      <option value="">Set severity…</option>
+                      {['low', 'medium', 'high', 'critical'].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    {report.reported?.id && banForm?.reportId !== report.id ? (
+                      <button
+                        className="btn btn-sm btn-danger"
+                        onClick={() => setBanForm({ userId: report.reported!.id, reportId: report.id })}
+                      >Ban User</button>
+                    ) : banForm?.reportId === report.id && (
+                      <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                        <input className="inp" style={{ fontSize: '0.6rem', padding: '0.2em 0.4em' }} placeholder="Reason" value={banReason} onChange={e => setBanReason(e.target.value)} />
+                        <select className="inp" style={{ fontSize: '0.58rem', padding: '0.2em 0.4em' }} value={banDuration} onChange={e => setBanDuration(e.target.value)}>
+                          <option value="7d">7 days</option><option value="14d">14 days</option><option value="30d">30 days</option><option value="90d">90 days</option>
+                        </select>
+                        <button className="btn btn-sm btn-danger" onClick={() => banUser(banForm!.userId, report.id)} disabled={!banReason || actionLoading === banForm!.userId}>Confirm Ban</button>
+                        <button className="btn btn-sm btn-ghost" onClick={() => setBanForm(null)}>Cancel</button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {editingNotes === report.id ? (
+                  <div style={{ display: 'flex', gap: '0.4rem', width: '100%' }}>
+                    <input className="inp" style={{ flex: 1, fontSize: '0.62rem' }} placeholder="Admin note…" value={adminNotes} onChange={e => setAdminNotes(e.target.value)} />
+                    <button className="btn btn-sm btn-primary" onClick={() => { updateReport(report.id, { adminNotes }); setEditingNotes(null); setAdminNotes(''); }}>Save</button>
+                    <button className="btn btn-sm btn-ghost" onClick={() => setEditingNotes(null)}>Cancel</button>
+                  </div>
+                ) : (
+                  <button className="btn btn-sm btn-ghost" style={{ fontSize: '0.58rem' }} onClick={() => { setEditingNotes(report.id); setAdminNotes(report.admin_notes || ''); }}>+ Admin Note</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* MODERATION TAB */}
+        {activeTab === 'moderation' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+            {/* Active Bans */}
+            <div>
+              <div className="sec-label" style={{ marginBottom: '1rem' }}>Active Bans ({bans.length})</div>
+              {bans.length === 0 ? (
+                <div className="notice notice-g">No active bans ✓</div>
+              ) : bans.map((ban) => (
+                <div key={ban.id} className="agent-card" style={{ marginBottom: '0.6rem', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <div>
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: '0.7rem', fontWeight: 600 }}>{ban.user?.name || 'Unknown'}</div>
+                      <div style={{ fontSize: '0.6rem', color: 'var(--muted)' }}>{ban.user?.email}</div>
+                      <div style={{ fontSize: '0.62rem', color: '#ccc', marginTop: '0.2rem' }}><strong>Reason:</strong> {ban.reason}</div>
+                      {ban.expires_at && <div style={{ fontSize: '0.58rem', color: 'var(--yellow)' }}>Expires: {format(parseISO(ban.expires_at), 'd MMM yyyy')}</div>}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                      <span className="badge badge-r" style={{ fontSize: '0.5rem' }}>{ban.ban_type}</span>
+                    </div>
+                  </div>
+                  {unbanningId === ban.id ? (
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <input className="inp" style={{ fontSize: '0.62rem', flex: 1 }} placeholder="Unban reason" value={unbanReason} onChange={e => setUnbanReason(e.target.value)} />
+                      <button className="btn btn-sm btn-primary" onClick={() => unbanUser(ban.id)} disabled={!unbanReason || actionLoading === ban.id}>Confirm</button>
+                      <button className="btn btn-sm btn-ghost" onClick={() => setUnbanningId(null)}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button className="btn btn-sm btn-ghost" onClick={() => setUnbanningId(ban.id)}>Unban</button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Pending Appeals */}
+            <div>
+              <div className="sec-label" style={{ marginBottom: '1rem' }}>Pending Appeals ({appeals.length})</div>
+              {appeals.length === 0 ? (
+                <div className="notice notice-g">No pending appeals ✓</div>
+              ) : appeals.map((appeal) => (
+                <div key={appeal.id} className="agent-card" style={{ marginBottom: '0.6rem', flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <div style={{ fontSize: '0.62rem', color: '#ccc', lineHeight: 1.5 }}>{appeal.appeal_text}</div>
+                  <div style={{ fontSize: '0.55rem', color: 'var(--muted)' }}>{format(parseISO(appeal.created_at), 'd MMM HH:mm')}</div>
+                  {reviewingAppeal === appeal.id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
+                      <input className="inp" style={{ fontSize: '0.62rem' }} placeholder="Response to user" value={appealResponse} onChange={e => setAppealResponse(e.target.value)} />
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <button className="btn btn-sm btn-primary" onClick={() => reviewAppeal(appeal.id, true)} disabled={!appealResponse}>Approve</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => reviewAppeal(appeal.id, false)} disabled={!appealResponse}>Deny</button>
+                        <button className="btn btn-sm btn-ghost" onClick={() => setReviewingAppeal(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button className="btn btn-sm btn-ghost" onClick={() => setReviewingAppeal(appeal.id)}>Review</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* HEALTH TAB */}
+        {activeTab === 'health' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <button className="btn btn-ghost btn-sm" onClick={loadHealth} style={{ alignSelf: 'flex-end' }}>↻ Refresh</button>
+            {!health ? (
+              <div style={{ textAlign: 'center', padding: '2rem' }}><span className="spinner" /></div>
+            ) : (
+              <>
+                <div className="grid-3">
+                  <div className="stat-card"><div className="sc-val">{health.orders.last24h}</div><div className="sc-lbl">Orders (24h)</div></div>
+                  <div className="stat-card"><div className="sc-val">{health.orders.lastHour}</div><div className="sc-lbl">Orders (1h)</div></div>
+                  <div className="stat-card"><div className="sc-val">{health.users.onlineNow}</div><div className="sc-lbl">Online Now</div></div>
+                </div>
+                <div className="grid-3">
+                  <div className="stat-card"><div className="sc-val">{health.emails.sentLast24h}</div><div className="sc-lbl">Emails Sent (24h)</div></div>
+                  <div className="stat-card"><div className="sc-val">{health.emails.deliveryRate}%</div><div className="sc-lbl">Delivery Rate</div></div>
+                  <div className="stat-card"><div className="sc-val" style={{ color: health.emails.failedLast24h > 0 ? 'var(--danger)' : 'var(--green)' }}>{health.emails.failedLast24h}</div><div className="sc-lbl">Failed (24h)</div></div>
+                </div>
+                <div className="grid-3">
+                  <div className="stat-card"><div className="sc-val" style={{ color: health.moderation.pendingReports > 0 ? 'var(--yellow)' : undefined }}>{health.moderation.pendingReports}</div><div className="sc-lbl">Pending Reports</div></div>
+                  <div className="stat-card"><div className="sc-val" style={{ color: health.moderation.activeBans > 0 ? 'var(--danger)' : undefined }}>{health.moderation.activeBans}</div><div className="sc-lbl">Active Bans</div></div>
+                  <div className="stat-card"><div className="sc-val" style={{ color: health.moderation.pendingAppeals > 0 ? 'var(--yellow)' : undefined }}>{health.moderation.pendingAppeals}</div><div className="sc-lbl">Pending Appeals</div></div>
+                </div>
+              </>
             )}
           </div>
         )}

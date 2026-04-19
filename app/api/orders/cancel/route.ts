@@ -1,20 +1,28 @@
 import { NextRequest } from 'next/server';
-import { createAdminClient } from '@/lib/supabase-server';
+import { createAdminClient, createClient } from '@/lib/supabase-server';
 import { apiSuccess, apiError, withErrorHandling } from '@/lib/api-helpers';
+import { getUserSafe } from '@/lib/auth';
+import { isValidUUID } from '@/lib/moderation';
+import { checkCancelAbuse, getCooldown } from '@/lib/fraud';
 
 export const POST = withErrorHandling(async (request: NextRequest) => {
-  const { orderId, userId } = await request.json();
+  const { orderId } = await request.json();
 
-  if (!orderId || !userId) {
-    return apiError('orderId and userId are required', 400);
+  if (!orderId || !isValidUUID(orderId)) {
+    return apiError('Valid orderId is required', 400);
   }
+
+  // Verify auth — don't trust client-provided userId
+  const authClient = await createClient();
+  const user = await getUserSafe(authClient);
+  if (!user) return apiError('Unauthorized', 401);
 
   const supabase = await createAdminClient();
 
-  // Verify order belongs to user and is still pending
+  // Fetch order to verify ownership
   const { data: order, error: fetchError } = await supabase
     .from('orders')
-    .select('id, customer_id, status')
+    .select('id, customer_id, agent_id, status')
     .eq('id', orderId)
     .single();
 
@@ -22,8 +30,20 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     return apiError('Order not found', 404);
   }
 
-  if (order.customer_id !== userId) {
-    return apiError('You can only cancel your own orders', 403);
+  // Only the customer or assigned dasher (or admin) can cancel
+  const isCustomer = order.customer_id === user.id;
+  const isDasher   = order.agent_id === user.id;
+
+  if (!isCustomer && !isDasher) {
+    // Check if admin
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    if (profile?.role !== 'admin') {
+      return apiError('You cannot cancel this order', 403);
+    }
   }
 
   if (order.status !== 'pending') {
@@ -43,5 +63,19 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     return apiError('Failed to cancel order', 500);
   }
 
+  // Check and enforce cancel abuse (non-blocking — only applies to customers)
+  if (isCustomer) {
+    await checkCancelAbuse(supabase, user.id).catch(() => {});
+    const cooldown = getCooldown(user.id);
+    if (cooldown.active) {
+      // Still let the cancel go through, but warn them
+      return apiSuccess({
+        message: 'Order cancelled successfully',
+        warning: cooldown.reason,
+      });
+    }
+  }
+
   return apiSuccess({ message: 'Order cancelled successfully' });
 });
+

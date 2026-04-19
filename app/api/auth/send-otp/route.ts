@@ -3,15 +3,29 @@ import { createAdminClient } from '@/lib/supabase-server';
 import { sendOtpEmail } from '@/lib/email';
 import { OTP_CONFIG } from '@/lib/config';
 import { apiSuccess, apiError, withErrorHandling, requireEmail } from '@/lib/api-helpers';
+import { otpLimiter } from '@/lib/rate-limit';
 import crypto from 'crypto';
 
 export const POST = withErrorHandling(async (request: NextRequest) => {
   const { email: rawEmail } = await request.json();
   const email = requireEmail(rawEmail);
 
+  // ── IP-based rate limit (prevents single IP from spamming many emails) ─
+  const ip =
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    request.headers.get('x-real-ip') ||
+    'unknown';
+  const ipResult = otpLimiter.check(`otp:ip:${ip}`);
+  if (!ipResult.allowed) {
+    return apiError(
+      `Too many OTP requests from your network. Wait ${OTP_CONFIG.cooldownSeconds} seconds.`,
+      429,
+    );
+  }
+
   const supabase = await createAdminClient();
 
-  // ── Rate limiting: check recent OTPs for this email ──────────
+  // ── Email-based rate limit: check recent OTPs for this email ──────────
   const windowStart = new Date(Date.now() - OTP_CONFIG.cooldownSeconds * 1000).toISOString();
   const { data: recent } = await supabase
     .from('otp_codes')

@@ -2,18 +2,20 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { getUserSafe } from '@/lib/auth';
 import { ORDER_STATUS_STEPS, FEATURES, UPI_ID } from '@/lib/config';
 import Nav from '@/components/Nav';
 import RatingModal from '@/components/RatingModal';
+import ReportModal from '@/components/ReportModal';
 import type { Order } from '@/types';
+
+const RATING_MODAL_DELAY_MS = 300;
 
 export default function OrderStatusPage() {
   const { id } = useParams() as { id: string };
-  const router = useRouter();
   const supabase = createClient();
 
   const [order, setOrder] = useState<Order | null>(null);
@@ -23,6 +25,13 @@ export default function OrderStatusPage() {
   const [cancelError, setCancelError] = useState('');
   const [showRating, setShowRating] = useState(false);
   const [hasRated, setHasRated] = useState(false);
+  const [ratingPromptDismissed, setRatingPromptDismissed] = useState(false);
+  const [delayedAutoOpenOrderId, setDelayedAutoOpenOrderId] = useState<string | null>(null);
+  const [showReport, setShowReport] = useState(false);
+
+  // Resolved agent id even when join is null (e.g. cancelled orders)
+  const resolvedAgentId = (order?.agent as { id?: string } | null)?.id ?? order?.agent_id ?? null;
+  const resolvedAgentName = (order?.agent as { name?: string } | null)?.name ?? 'Dasher';
 
   useEffect(() => {
     async function init() {
@@ -67,6 +76,25 @@ export default function OrderStatusPage() {
     return () => { supabase.removeChannel(channel); };
   }, [id]);
 
+  useEffect(() => {
+    if (!order || !user) return;
+
+    const shouldQueueAutoOpen =
+      order.status === 'delivered' &&
+      user.id === order.customer_id &&
+      !hasRated &&
+      !ratingPromptDismissed &&
+      delayedAutoOpenOrderId !== order.id;
+
+    if (!shouldQueueAutoOpen) return;
+
+    const timer = setTimeout(() => {
+      setDelayedAutoOpenOrderId(order.id);
+    }, RATING_MODAL_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [order, user, hasRated, ratingPromptDismissed, delayedAutoOpenOrderId]);
+
   async function cancelOrder() {
     if (!order || !user) return;
     setCancelling(true);
@@ -103,8 +131,15 @@ export default function OrderStatusPage() {
 
   const currentStepIdx = ORDER_STATUS_STEPS.findIndex((s) => s.key === order.status);
   const shortId = order.id.slice(-4).toUpperCase();
-  const agentInfo = order.agent as any;
+  const agentInfo = order.agent as { id?: string; name?: string; rating?: number; phone?: string } | null;
   const isTerminal = order.status === 'delivered' || order.status === 'cancelled';
+  const shouldAutoShowRating =
+    delayedAutoOpenOrderId === order.id &&
+    order.status === 'delivered' &&
+    !!user &&
+    user.id === order.customer_id &&
+    !hasRated &&
+    !ratingPromptDismissed;
 
   return (
     <>
@@ -145,7 +180,7 @@ export default function OrderStatusPage() {
                     className="btn btn-sm btn-primary"
                     style={{ fontSize: '0.6rem', whiteSpace: 'nowrap' }}
                   >
-                    📞 Call Now
+                    Call Now
                   </a>
                 </div>
               )}
@@ -246,7 +281,7 @@ export default function OrderStatusPage() {
         )}
 
         {/* Rating prompt for delivered orders */}
-        {order.status === 'delivered' && user && user.id === order.customer_id && agentInfo && !hasRated && (
+        {order.status === 'delivered' && user && user.id === order.customer_id && !hasRated && (
           <div style={{ marginTop: '1.5rem', textAlign: 'center', animation: 'fadeInUp 0.5s ease' }}>
             <div className="type-label" style={{ marginBottom: '0.8rem', color: 'var(--yellow)' }}>How was your delivery experience?</div>
             <button
@@ -265,17 +300,48 @@ export default function OrderStatusPage() {
             <Link href="/orders" className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }}>Order History</Link>
           </div>
         )}
+
+        {/* Report Dasher — visible for any order that ever had a dasher (all statuses after pending) */}
+        {resolvedAgentId && order.status !== 'pending' && user && user.id === order.customer_id && (
+          <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
+            <button
+              className="btn btn-sm btn-ghost"
+              style={{ fontSize: '0.58rem', color: 'var(--muted)', borderColor: 'var(--muted)', boxShadow: 'none' }}
+              onClick={() => setShowReport(true)}
+            >
+              {isTerminal ? 'Had an issue? Report Dasher' : 'Report Dasher'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Rating modal */}
-      {showRating && user && agentInfo && (
+      {(showRating || shouldAutoShowRating) && user && (
         <RatingModal
           orderId={order.id}
           raterId={user.id}
-          ratedName={agentInfo.name || 'Your Dasher'}
+          ratedName={agentInfo?.name || 'Your Dasher'}
           raterRole="customer"
-          onClose={() => setShowRating(false)}
-          onSubmitted={() => setHasRated(true)}
+          onClose={() => {
+            setShowRating(false);
+            setRatingPromptDismissed(true);
+          }}
+          onSubmitted={() => {
+            setHasRated(true);
+            setShowRating(false);
+            setRatingPromptDismissed(true);
+          }}
+        />
+      )}
+
+      {/* Report Dasher modal */}
+      {showReport && resolvedAgentId && (
+        <ReportModal
+          isOpen={showReport}
+          onClose={() => setShowReport(false)}
+          reportedId={resolvedAgentId}
+          reportedName={resolvedAgentName}
+          orderId={order.id}
         />
       )}
     </>

@@ -4,6 +4,9 @@ import { EMAIL_CONFIG } from '@/lib/config';
 import { getUserSafe } from '@/lib/auth';
 import { apiError, apiSuccess, withErrorHandling } from '@/lib/api-helpers';
 import { sendTrackedEmail, shouldSendDasherOpportunityEmail } from '@/lib/communication-policy';
+import { checkUserBan } from '@/lib/moderation';
+import { orderCreateLimiter } from '@/lib/rate-limit';
+import { getCooldown, checkRapidOrderCreation } from '@/lib/fraud';
 
 const VALID_ZONES = new Set(['on_campus', 'shiv_temple', 'off_campus']);
 const VALID_PAYMENT_METHODS = new Set(['agent_float', 'upi_on_delivery']);
@@ -49,12 +52,39 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
     return apiError('Commission must be greater than 0', 400);
   }
 
+  // Input length limits
+  if (itemDescription.length > 500) return apiError('Item description too long', 400);
+  if (pickupLocation.length > 200) return apiError('Pickup location too long', 400);
+  if (deliveryHostel.length > 200) return apiError('Delivery location too long', 400);
+  if (deliveryRoom.length > 50) return apiError('Room number too long', 400);
+  if (orderValue > 50000) return apiError('Order value exceeds maximum', 400);
+  if (commissionAmount > 10000) return apiError('Commission exceeds maximum', 400);
+
   const authClient = await createClient();
   const user = await getUserSafe(authClient);
 
   if (!user) {
     return apiError('Unauthorized', 401);
   }
+
+  // Rate limit
+  const rl = orderCreateLimiter.check(user.id);
+  if (!rl.allowed) return apiError('Too many orders. Slow down.', 429);
+
+  // Ban check
+  const adminClient = await createAdminClient();
+  const banCheck = await checkUserBan(adminClient, user.id);
+  if (banCheck.isBanned) {
+    return apiError('Your account is suspended. You cannot place orders.', 403);
+  }
+
+  // Fraud cooldown check (cancel abuse / rapid creation)
+  const cooldown = getCooldown(user.id);
+  if (cooldown.active) return apiError(cooldown.reason, 429);
+
+  // Check for rapid order creation pattern
+  const rapidBlock = await checkRapidOrderCreation(adminClient, user.id);
+  if (rapidBlock) return apiError(rapidBlock, 429);
 
   const { data: inserted, error: insertError } = await authClient
     .from('orders')

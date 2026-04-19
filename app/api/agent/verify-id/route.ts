@@ -1,58 +1,83 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase-server';
+import { NextRequest } from 'next/server';
+import { createAdminClient, createClient } from '@/lib/supabase-server';
+import { getUserSafe } from '@/lib/auth';
+import { apiError, apiSuccess, withErrorHandling } from '@/lib/api-helpers';
 import crypto from 'crypto';
 
-export async function POST(request: NextRequest) {
-  try {
-    const { userId, srmId, idCardUrl, expectedName } = await request.json();
-
-    if (!userId || !srmId || !idCardUrl || !expectedName) {
-      return NextResponse.json({ ok: false, error: 'Missing required fields' }, { status: 400 });
-    }
-
-    const supabase = await createAdminClient();
-
-    // Check if SRM ID hash is blocked
-    const srmIdHash = crypto.createHash('sha256').update(srmId).digest('hex');
-    const { data: existingBlocked } = await supabase
-      .from('users')
-      .select('id')
-      .eq('blocked_id_hash', srmIdHash)
-      .single();
-
-    if (existingBlocked) {
-      return NextResponse.json({
-        ok: false,
-        error: 'This SRM ID has been permanently blocked from DASHR due to policy violations.',
-      }, { status: 403 });
-    }
-
-    // Attempt OCR with tesseract.js (server-side)
-    let nameMatchPassed = false;
-    try {
-      // Dynamic import to avoid bundle issues
-      const Tesseract = await import('tesseract.js');
-      const { data: { text } } = await Tesseract.default.recognize(idCardUrl, 'eng', {});
-      const extractedText = text.toUpperCase();
-      const nameParts = expectedName.toUpperCase().split(' ').filter((p: string) => p.length > 2);
-      // Check if at least 2 name parts (first + last) appear in extracted text
-      const matchCount = nameParts.filter((part: string) => extractedText.includes(part)).length;
-      nameMatchPassed = matchCount >= Math.min(2, nameParts.length);
-    } catch (ocrError) {
-      // OCR failed — fall back to admin manual review (still proceed)
-      console.error('OCR failed, falling back to manual review:', ocrError);
-      nameMatchPassed = true; // Admin will approve manually
-    }
-
-    if (!nameMatchPassed) {
-      return NextResponse.json({
-        ok: false,
-        error: `Name on ID card does not match "${expectedName}". Ensure your ID card matches your registered name exactly.`,
-      }, { status: 422 });
-    }
-
-    return NextResponse.json({ ok: true, message: 'ID submitted for admin review' });
-  } catch (err) {
-    return NextResponse.json({ ok: false, error: 'Internal error' }, { status: 500 });
+export const POST = withErrorHandling(async (request: NextRequest) => {
+  // Auth check — must be logged in
+  const authClient = await createClient();
+  const sessionUser = await getUserSafe(authClient);
+  if (!sessionUser) {
+    return apiError('Unauthorized', 401);
   }
-}
+
+  const { userId, srmId, idCardUrl, expectedName } = await request.json();
+
+  if (!userId || !srmId || !idCardUrl || !expectedName) {
+    return apiError('Missing required fields', 400);
+  }
+
+  // Ensure the userId in the request matches the authenticated user
+  if (userId !== sessionUser.id) {
+    return apiError('Forbidden', 403);
+  }
+
+  // Input length guards — prevent DoS via huge OCR payloads
+  if (typeof srmId !== 'string' || srmId.length > 50) {
+    return apiError('Invalid SRM ID', 400);
+  }
+  if (typeof expectedName !== 'string' || expectedName.length > 100) {
+    return apiError('Name too long', 400);
+  }
+  if (typeof idCardUrl !== 'string' || idCardUrl.length > 1000) {
+    return apiError('Invalid ID card URL', 400);
+  }
+
+  // Validate idCardUrl is a proper Supabase storage URL (prevent SSRF)
+  const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  if (!idCardUrl.startsWith(SUPABASE_URL)) {
+    return apiError('Invalid ID card URL', 400);
+  }
+
+  const supabase = await createAdminClient();
+
+  // Check if SRM ID hash is blocked
+  const srmIdHash = crypto.createHash('sha256').update(srmId).digest('hex');
+  const { data: existingBlocked } = await supabase
+    .from('users')
+    .select('id')
+    .eq('blocked_id_hash', srmIdHash)
+    .single();
+
+  if (existingBlocked) {
+    return apiError(
+      'This SRM ID has been permanently blocked from DASHR due to policy violations.',
+      403,
+    );
+  }
+
+  // Attempt OCR with tesseract.js (server-side)
+  let nameMatchPassed = false;
+  try {
+    const Tesseract = await import('tesseract.js');
+    const { data: { text } } = await Tesseract.default.recognize(idCardUrl, 'eng', {});
+    const extractedText = text.toUpperCase();
+    const nameParts = expectedName.toUpperCase().split(' ').filter((p: string) => p.length > 2);
+    const matchCount = nameParts.filter((part: string) => extractedText.includes(part)).length;
+    nameMatchPassed = matchCount >= Math.min(2, nameParts.length);
+  } catch (ocrError) {
+    // OCR failed — fall back to admin manual review
+    console.error('OCR failed, falling back to manual review:', ocrError);
+    nameMatchPassed = true;
+  }
+
+  if (!nameMatchPassed) {
+    return apiError(
+      `Name on ID card does not match "${expectedName}". Ensure your ID card matches your registered name exactly.`,
+      422,
+    );
+  }
+
+  return apiSuccess({ message: 'ID submitted for admin review' });
+});

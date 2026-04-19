@@ -2,19 +2,24 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { getUserSafe } from '@/lib/auth';
 import OrderCard from '@/components/OrderCard';
 import AgentShell from '@/components/AgentShell';
 import type { Order, User } from '@/types';
 
+const MAX_ACTIVE_ORDERS = 3;
+
 export default function AgentDashboard() {
   const supabase = createClient();
+  const router = useRouter();
 
   const [agent, setAgent] = useState<User | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [accepting, setAccepting] = useState<string | null>(null);
   const [acceptError, setAcceptError] = useState('');
+  const [activeOrdersCount, setActiveOrdersCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const loadOrders = useCallback(async (userId: string) => {
@@ -27,6 +32,16 @@ export default function AgentDashboard() {
     setOrders((data as Order[]) || []);
   }, []);
 
+  const loadActiveOrdersCount = useCallback(async (userId: string) => {
+    const { count } = await supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('agent_id', userId)
+      .in('status', ['assigned', 'picked_up']);
+
+    setActiveOrdersCount(count || 0);
+  }, []);
+
   useEffect(() => {
     async function init() {
       const user = await getUserSafe(supabase);
@@ -36,7 +51,10 @@ export default function AgentDashboard() {
       if (!profile || profile.role !== 'agent') return;
       setAgent(profile as User);
 
-      await loadOrders(user.id);
+      await Promise.all([
+        loadOrders(user.id),
+        loadActiveOrdersCount(user.id),
+      ]);
       setLoading(false);
     }
     init();
@@ -59,8 +77,15 @@ export default function AgentDashboard() {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  const canAcceptMore = activeOrdersCount < MAX_ACTIVE_ORDERS;
+
   async function acceptOrder(orderId: string) {
     if (!agent) return;
+    if (!canAcceptMore) {
+      setAcceptError(`You already have ${MAX_ACTIVE_ORDERS} active deliveries. Complete one first.`);
+      return;
+    }
+
     setAccepting(orderId);
     setAcceptError('');
 
@@ -68,7 +93,7 @@ export default function AgentDashboard() {
       const res = await fetch('/api/orders/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, agentId: agent.id }),
+        body: JSON.stringify({ orderId }),
       });
       const data = await res.json();
 
@@ -79,8 +104,9 @@ export default function AgentDashboard() {
       }
 
       setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      setActiveOrdersCount((prev) => Math.min(MAX_ACTIVE_ORDERS, prev + 1));
       setAccepting(null);
-      window.location.href = '/agent/active';
+      router.push('/agent/active');
     } catch {
       setAcceptError('Network error. Try again.');
       setAccepting(null);
@@ -98,6 +124,9 @@ export default function AgentDashboard() {
               {orders.length} order{orders.length !== 1 ? 's' : ''} available
             </div>
           )}
+          <span className={`badge ${canAcceptMore ? 'badge-b' : 'badge-r'}`}>
+            Active: {activeOrdersCount}/{MAX_ACTIVE_ORDERS}
+          </span>
           {(agent?.rating || 0) >= 4.5 && (
             <span className="badge badge-yf">Priority Queue</span>
           )}
@@ -114,6 +143,12 @@ export default function AgentDashboard() {
       {acceptError && (
         <div className="notice notice-r" style={{ margin: '1rem' }}>
           {acceptError}
+        </div>
+      )}
+
+      {agent?.is_online && !canAcceptMore && (
+        <div className="notice notice-y" style={{ margin: '1rem' }}>
+          You are at the max of {MAX_ACTIVE_ORDERS} active deliveries. Finish one from Active Delivery to accept more.
         </div>
       )}
 
@@ -138,7 +173,7 @@ export default function AgentDashboard() {
               <OrderCard
                 order={order}
                 onAccept={agent?.is_verified ? acceptOrder : undefined}
-                showActions={!accepting && !!agent?.is_verified}
+                showActions={!accepting && !!agent?.is_verified && canAcceptMore}
               />
             </div>
           ))
