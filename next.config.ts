@@ -67,6 +67,14 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  // Ensure worker-thread OCR dependencies are present in serverless traces.
+  outputFileTracingIncludes: {
+    '/api/agent/verify-id': [
+      './node_modules/tesseract.js/**/*',
+      './node_modules/tesseract.js-core/**/*',
+    ],
+  },
+
   serverExternalPackages: ['tesseract.js'],
 
   // Required when coexisting with a webpack config in Next.js 16 (Turbopack default)
