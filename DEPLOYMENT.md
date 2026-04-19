@@ -41,6 +41,13 @@ BREVO_SENDER_NAME=DASHR
 > ⚠️ **Never commit `.env.local` to git.** It is already in `.gitignore`.
 > Set all secrets in your Vercel / CI dashboard for production deployments.
 
+> 🚨 **CRITICAL — `NEXT_PUBLIC_APP_URL` in Vercel Dashboard:**
+> `.env.local` is **only used locally**. In production (Vercel), you MUST set `NEXT_PUBLIC_APP_URL`
+> in the **Vercel Environment Variables dashboard** (Settings → Environment Variables).
+> If this var is missing in Vercel, the CSRF origin check will reject ALL mutation requests
+> (POST/PATCH/DELETE) with **403 Forbidden** — including `/api/auth/send-otp`.
+
+
 ---
 
 ## 2. Database Migrations

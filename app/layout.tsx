@@ -13,6 +13,10 @@ export const metadata: Metadata = {
     'DASHR is a student-run delivery service at SRM IST. Order food, stationery, or anything on campus and have a fellow student drop it to your hostel room.',
   keywords: ['SRM delivery', 'campus delivery', 'SRM IST', 'hostel delivery', 'DASHR', 'SRM food delivery'],
   authors: [{ name: 'DASHR' }],
+  // Canonical URL — tells Google the definitive address for this page
+  alternates: {
+    canonical: APP_URL,
+  },
   robots: {
     index: true,
     follow: true,

@@ -24,23 +24,38 @@ export function checkOrigin(request: NextRequest): boolean {
   // If neither header is present (e.g., server-to-server), allow
   if (!origin && !referer) return true;
 
-  const appHost = process.env.NEXT_PUBLIC_APP_URL || '';
-  const check = origin || referer || '';
-
-  // Allow same-origin, localhost in dev, and configured app URL
-  if (
-    check.startsWith('http://localhost') ||
-    check.startsWith('https://localhost') ||
-    (appHost && check.startsWith(appHost))
-  ) {
-    return true;
-  }
+  const appUrl    = process.env.NEXT_PUBLIC_APP_URL || '';         // e.g. https://dashr.app
+  const altUrl    = process.env.NEXT_PUBLIC_ALT_URL || '';         // e.g. https://dashr-hehe.vercel.app
+  // VERCEL_URL is auto-injected by Vercel per-deployment (no protocol prefix)
+  const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '';
+  const check     = origin || referer || '';
 
   // In development, always allow
   if (process.env.NODE_ENV !== 'production') return true;
 
+  // Allow localhost (useful for local production builds)
+  if (check.startsWith('http://localhost') || check.startsWith('https://localhost')) {
+    return true;
+  }
+
+  // Allow the configured canonical app URL (set NEXT_PUBLIC_APP_URL=https://dashr.app in Vercel)
+  if (appUrl && check.startsWith(appUrl)) return true;
+
+  // Allow an optional secondary URL (set NEXT_PUBLIC_ALT_URL=https://dashr-hehe.vercel.app in Vercel)
+  if (altUrl && check.startsWith(altUrl)) return true;
+
+  // Allow Vercel deployment URL — auto-covers the current deployment's *.vercel.app domain
+  if (vercelUrl && check.startsWith(vercelUrl)) return true;
+
+  // Allow VERCEL_PROJECT_PRODUCTION_URL — the stable production URL Vercel assigns the project
+  const vercelProject = process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : '';
+  if (vercelProject && check.startsWith(vercelProject)) return true;
+
   return false;
 }
+
 
 // ── STANDARDIZED RESPONSES ────────────────────────────────────
 
