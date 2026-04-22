@@ -347,13 +347,15 @@ export default function OrderStatusPage() {
         />
       )}
 
-      {/* In-app chat — visible once a dasher is assigned */}
+      {/* In-app chat — visible once a dasher is assigned.
+           offsetButton: shift the chat FAB upward so it doesn't overlap the Report Dasher button. */}
       {user && order.agent_id && (
         <ChatDrawer
           orderId={order.id}
           currentUserId={user.id}
           otherPartyName={agentInfo?.name || 'Dasher'}
           orderStatus={order.status}
+          offsetButton={!!(resolvedAgentId && order.status !== 'pending' && user && user.id === order.customer_id)}
         />
       )}
     </>

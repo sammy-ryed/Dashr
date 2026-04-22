@@ -18,9 +18,11 @@ interface ChatDrawerProps {
   /** Name of the other party (customer's dasher name or dasher's customer name) */
   otherPartyName: string;
   orderStatus: string;
+  /** If true, offset the chat button upward so it doesn't clash with other fixed buttons (e.g. Report button) */
+  offsetButton?: boolean;
 }
 
-export default function ChatDrawer({ orderId, currentUserId, otherPartyName, orderStatus }: ChatDrawerProps) {
+export default function ChatDrawer({ orderId, currentUserId, otherPartyName, orderStatus, offsetButton }: ChatDrawerProps) {
   const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -30,6 +32,7 @@ export default function ChatDrawer({ orderId, currentUserId, otherPartyName, ord
   const [unread, setUnread] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const isTerminal = ['delivered', 'cancelled', 'expired'].includes(orderStatus);
 
@@ -46,28 +49,50 @@ export default function ChatDrawer({ orderId, currentUserId, otherPartyName, ord
   useEffect(() => {
     loadMessages();
 
-    // Real-time subscription
-    let channel: ReturnType<typeof supabase.channel> | null = null;
-    try {
-      channel = supabase
-        .channel(`chat-${orderId}`)
+    // Real-time subscription — tear down any existing channel first
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    const channel = supabase
+      .channel(`chat-${orderId}-${currentUserId}`)
+      .on(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .on('postgres_changes' as any, {
+        'postgres_changes' as any,
+        {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
           filter: `order_id=eq.${orderId}`,
-        }, (payload: { new: Message }) => {
-          setMessages((prev) => [...prev, payload.new]);
-          if (!open && payload.new.sender_id !== currentUserId) {
+        },
+        (payload: { new: Message }) => {
+          setMessages((prev) => {
+            // Deduplicate: don't add if already in state (e.g. optimistic add)
+            if (prev.some((m) => m.id === payload.new.id)) return prev;
+            return [...prev, payload.new];
+          });
+          if (payload.new.sender_id !== currentUserId) {
             setUnread((n) => n + 1);
           }
-        })
-        .subscribe();
-    } catch { /* realtime unavailable */ }
+        },
+      )
+      .subscribe((status: string) => {
+        // If subscription fails, fall back to polling every 5s
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[chat] Realtime unavailable, falling back to polling');
+        }
+      });
 
-    return () => { if (channel) supabase.removeChannel(channel); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
   // Scroll to bottom when new messages arrive or drawer opens
@@ -108,6 +133,10 @@ export default function ChatDrawer({ orderId, currentUserId, otherPartyName, ord
   const formatTime = (iso: string) =>
     new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
+  // The chat button sits at bottom-right; if offsetButton is true it sits higher
+  // to avoid clashing with a Report button at the default 1.5rem position
+  const buttonBottom = offsetButton ? '5.2rem' : '1.5rem';
+
   return (
     <>
       {/* Floating chat button */}
@@ -115,7 +144,7 @@ export default function ChatDrawer({ orderId, currentUserId, otherPartyName, ord
         onClick={() => setOpen(true)}
         aria-label="Open chat"
         style={{
-          position: 'fixed', bottom: '1.5rem', right: '1.5rem', zIndex: 200,
+          position: 'fixed', bottom: buttonBottom, right: '1.5rem', zIndex: 200,
           width: '3.2rem', height: '3.2rem',
           background: 'var(--yellow)', color: 'var(--ink)',
           border: '0.18rem solid var(--ink)',
