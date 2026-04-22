@@ -1,7 +1,8 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState, useRef, Suspense } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
+
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { getUserSafe } from '@/lib/auth';
@@ -10,7 +11,8 @@ function OnboardingContent() {
   const router = useRouter();
   const params = useSearchParams();
   const isPending = params.get('pending') === 'true';
-  const defaultRole = params.get('role') === 'agent' ? 'agent' : 'customer';
+  const isUpgrade = params.get('upgrade') === 'true'; // existing customer upgrading to dasher
+  const defaultRole = (params.get('role') === 'agent' || isUpgrade) ? 'agent' : 'customer';
 
   const supabase = createClient();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -24,6 +26,27 @@ function OnboardingContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [policyAccepted, setPolicyAccepted] = useState(false);
+  const [prefilling, setPrefilling] = useState(isUpgrade);
+
+  // For upgrade flow: pre-load existing profile so user doesn't re-enter name/phone
+  useEffect(() => {
+    if (!isUpgrade) return;
+    async function prefill() {
+      const user = await getUserSafe(supabase);
+      if (!user) { router.push('/login'); return; }
+      const { data } = await supabase.from('users').select('name, phone, accepted_policy_version').eq('id', user.id).single();
+      if (data) {
+        setName(data.name || '');
+        setPhone(data.phone || '');
+        // If they've already accepted policy, pre-tick it
+        if (data.accepted_policy_version) setPolicyAccepted(true);
+      }
+      setPrefilling(false);
+    }
+    prefill();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   if (isPending) {
     return (
@@ -36,6 +59,14 @@ function OnboardingContent() {
           </div>
           <a href="/order" className="btn btn-ghost btn-block">Order Something While You Wait</a>
         </div>
+      </div>
+    );
+  }
+
+  if (prefilling) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span className="spinner" style={{ width: '2.5rem', height: '2.5rem' }} />
       </div>
     );
   }
@@ -53,13 +84,27 @@ function OnboardingContent() {
     const user = await getUserSafe(supabase);
     if (!user) { router.push('/login'); return; }
 
+    // Upgrade flow: user already has a profile — just set pending_agent=true, skip full upsert
+    if (isUpgrade) {
+      await supabase.from('users').update({
+        pending_agent: true,
+        accepted_policy_version: '1.0',
+        accepted_policy_at: new Date().toISOString(),
+      }).eq('id', user.id);
+      setStep('agent-id');
+      setLoading(false);
+      return;
+    }
+
+    // Always save as 'customer' — role is promoted to 'agent' only after admin verification.
     const { error: upsertError } = await supabase.from('users').upsert({
       id: user.id,
       name: name.trim(),
       phone: phone.replace(/\D/g, ''),
       email: user.email,
-      role,
-      is_verified: role === 'customer',
+      role: 'customer',
+      pending_agent: role === 'agent',
+      is_verified: true, // customers are always verified
       accepted_policy_version: '1.0',
       accepted_policy_at: new Date().toISOString(),
     });
@@ -102,15 +147,19 @@ function OnboardingContent() {
       return;
     }
 
+    // Keep role='customer' until admin approves. pending_agent=true marks them as waiting.
     await supabase.from('users').update({
       srm_id: srmId.trim(),
       id_card_url: publicUrl,
-      is_verified: false,
+      is_verified: true, // customer-level access still works
+      pending_agent: true,
+      // role stays 'customer' — admin approval route promotes to 'agent'
     }).eq('id', user.id);
 
     router.push('/onboarding?pending=true');
     setLoading(false);
   }
+
 
   return (
     <div className="page-enter" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>

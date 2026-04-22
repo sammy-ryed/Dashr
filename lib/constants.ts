@@ -31,7 +31,8 @@ export const ORDER_STATUS_STEPS = [
 ] as const;
 
 export type Zone = keyof typeof COMMISSION_FLOORS;
-export type OrderStatus = 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled';
+export type OrderStatus = 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'cancelled' | 'expired';
+
 export type PaymentMethod = 'agent_float' | 'upi_on_delivery';
 export type UserRole = 'customer' | 'agent' | 'admin';
 export type LedgerType = 'commission' | 'reimbursement';

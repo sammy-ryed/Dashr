@@ -17,14 +17,19 @@ export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   applicationName: 'DASHR',
   title: {
-    default: 'DASHR — Campus Delivery for SRM Students',
+    default: 'DASHR',
     template: '%s | DASHR',
   },
+
   description:
-    'DASHR is a student-run delivery service at SRM IST. Order food, stationery, or anything on campus and have a fellow student drop it to your hostel room.',
-  keywords: ['SRM delivery', 'campus delivery', 'SRM IST', 'hostel delivery', 'DASHR', 'SRM food delivery'],
-  authors: [{ name: 'DASHR' }],
-  // Canonical URL — tells Google the definitive address for this page
+    'DASHR is a student-run delivery service at SRM IST. Order food, stationery, or anything on campus and have a verified student dasher drop it at your hostel room. No walking required.',
+  keywords: [
+    'SRM delivery', 'campus delivery', 'SRM IST', 'hostel delivery',
+    'DASHR', 'SRM food delivery', 'SRM Kattankulathur', 'student delivery',
+    'deliver to hostel', 'SRM campus app',
+  ],
+  authors: [{ name: 'DASHR Team' }],
+  category: 'food delivery',
   alternates: {
     canonical: APP_URL,
   },
@@ -43,23 +48,28 @@ export const metadata: Metadata = {
     locale: 'en_IN',
     url: APP_URL,
     siteName: 'DASHR',
-    title: 'DASHR — Campus Delivery for SRM Students',
+    title: 'DASHR',
+
     description:
-      'Order anything on or around SRM IST campus and a verified student dasher will deliver it to your hostel room.',
+      'Order anything on or around SRM IST campus and a verified student dasher will deliver it to your hostel room. No walking. No excuses.',
     images: [
       {
         url: '/og-image.png',
         width: 1200,
         height: 630,
         alt: 'DASHR — SRM Campus Delivery',
+        // WhatsApp uses og:image directly — ensure image is < 300KB and >= 300x200
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'DASHR — Campus Delivery for SRM Students',
+    site: '@dashr_srm',
+    creator: '@dashr_srm',
+    title: 'DASHR',
     description:
-      'Order from anywhere on SRM campus and get it delivered to your hostel door by a fellow student.',
+      'Order anything on or around SRM IST campus and a verified student dasher will deliver it to your hostel room. No walking. No excuses.',
+
     images: ['/og-image.png'],
   },
   manifest: '/manifest.json',
@@ -79,6 +89,11 @@ export const metadata: Metadata = {
   other: {
     'msapplication-TileColor': '#0f0f0f',
     'msapplication-config': '/browserconfig.xml',
+    // WhatsApp / LinkedIn use og: tags — covered above
+    // Explicit og:image:type helps WhatsApp resolve the preview
+    'og:image:type': 'image/png',
+    'og:image:width': '1200',
+    'og:image:height': '630',
   },
 };
 

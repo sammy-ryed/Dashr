@@ -25,7 +25,11 @@ export interface User {
   accepted_policy_version: string | null;
   accepted_policy_at: string | null;
   created_at: string;
+  // Feature additions
+  pending_agent?: boolean;
+  has_seen_tips?: boolean;
 }
+
 
 export interface Order {
   id: string;

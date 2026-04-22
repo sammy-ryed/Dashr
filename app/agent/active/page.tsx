@@ -8,7 +8,9 @@ import { getUserSafe } from '@/lib/auth';
 import AgentShell from '@/components/AgentShell';
 import RatingModal from '@/components/RatingModal';
 import ReportModal from '@/components/ReportModal';
+import ChatDrawer from '@/components/ChatDrawer';
 import type { Order } from '@/types';
+
 
 const MAX_ACTIVE_ORDERS = 3;
 const RATING_MODAL_DELAY_MS = 300;
@@ -52,10 +54,39 @@ export default function AgentActivePage() {
 
       setOrders((data as Order[]) || []);
       setLoading(false);
+
+      // Real-time: auto-update active delivery status (#6)
+      // try/catch: degrades gracefully if Realtime not enabled on this Supabase plan
+      let channel: ReturnType<typeof supabase.channel> | null = null;
+      try {
+        channel = supabase
+          .channel(`agent-active-${user.id}`)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .on('postgres_changes' as any, {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'orders',
+            filter: `agent_id=eq.${user.id}`,
+          }, (payload: { new: Partial<Order> }) => {
+            const updated = payload.new;
+            if (updated.status === 'delivered' || updated.status === 'cancelled') {
+              setOrders((prev) => prev.filter((o) => o.id !== updated.id));
+            } else {
+              setOrders((prev) => prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)));
+            }
+          })
+          .subscribe();
+      } catch {
+        // Realtime unavailable — page still works, just no live updates
+      }
+
+      return () => { if (channel) supabase.removeChannel(channel); };
     }
 
     load();
   }, []);
+
+
 
   useEffect(() => {
     if (showRating || ratingQueue.length === 0) return;
@@ -297,6 +328,20 @@ export default function AgentActivePage() {
             orderId={reportTarget.orderId}
           />
         )}
+
+        {/* In-app chat: dasher chats with the customer of their first active order */}
+        {agentId && orders.length > 0 && (() => {
+          const chatOrder = orders[0];
+          const customer = chatOrder.customer as { id?: string; name?: string } | null;
+          return customer?.id ? (
+            <ChatDrawer
+              orderId={chatOrder.id}
+              currentUserId={agentId}
+              otherPartyName={customer.name || 'Customer'}
+              orderStatus={chatOrder.status}
+            />
+          ) : null;
+        })()}
       </div>
     </AgentShell>
   );

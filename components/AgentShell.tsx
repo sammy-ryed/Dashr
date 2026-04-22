@@ -8,6 +8,8 @@ import { getUserSafe } from '@/lib/auth';
 import type { User } from '@/types';
 import NotificationBell from '@/components/NotificationBell';
 import HamburgerThemePanel from '@/components/HamburgerThemePanel';
+import TipsOverlay from '@/components/TipsOverlay';
+
 
 interface AgentShellProps {
   children: React.ReactNode;
@@ -34,7 +36,9 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
   const [loggingOut, setLoggingOut] = useState(false);
   const [customerMode, setCustomerMode] = useState(false);
   const [navHidden, setNavHidden] = useState(false);
+  const [showTips, setShowTips] = useState(false);
   const lastScrollYRef = useRef(0);
+
 
   useEffect(() => {
     async function init() {
@@ -44,6 +48,8 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
       const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
       if (!profile || profile.role !== 'agent') { router.push('/order'); return; }
       setAgent(profile as User);
+      if (!profile.has_seen_tips) setShowTips(true);
+
 
       // Weekly earnings
       const { data: ledger } = await supabase
@@ -388,8 +394,11 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
         </div>
       )}
 
+      {showTips && agent && <TipsOverlay userId={agent.id} role="agent" />}
+
       {/* Dashboard layout with sidebar */}
       <div className="dash-wrap" style={{ margin: '0' }}>
+
         <aside className="sidebar">
           <div className="sb-head">
             <div className="sb-agent-name">{agent?.name?.split(' ')[0] || 'Dasher'}</div>

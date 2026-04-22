@@ -21,6 +21,7 @@ const STORAGE_KEY = 'dashr_theme_preferences_v1';
 export const THEME_STORAGE_KEY = STORAGE_KEY;
 
 export const THEME_PRESETS: ThemePreset[] = [
+  // ── DARK ──────────────────────────────────────────────────────
   {
     id: 'classic',
     label: 'Classic',
@@ -31,13 +32,13 @@ export const THEME_PRESETS: ThemePreset[] = [
     hamburgerBgColor: '#0f0f0f',
   },
   {
-    id: 'purple-pop',
-    label: 'Purple Pop',
-    bgColor: '#f6f2ea',
-    boxColor: '#efe8ff',
-    accentColor: '#7b2cbf',
-    headerBgColor: '#f1ece2',
-    hamburgerBgColor: '#f1ece2',
+    id: 'void-red',
+    label: 'Void Red',
+    bgColor: '#0a0505',
+    boxColor: '#1a0a0a',
+    accentColor: '#ef233c',
+    headerBgColor: '#0a0505',
+    hamburgerBgColor: '#110808',
   },
   {
     id: 'midnight',
@@ -47,6 +48,92 @@ export const THEME_PRESETS: ThemePreset[] = [
     accentColor: '#67e8f9',
     headerBgColor: '#0d1020',
     hamburgerBgColor: '#0d1020',
+  },
+  {
+    id: 'forest-night',
+    label: 'Forest Night',
+    bgColor: '#0d110d',
+    boxColor: '#131a13',
+    accentColor: '#a3e635',
+    headerBgColor: '#0d110d',
+    hamburgerBgColor: '#0d110d',
+  },
+  {
+    id: 'deep-purple',
+    label: 'Deep Purple',
+    bgColor: '#110d1a',
+    boxColor: '#1e1428',
+    accentColor: '#c084fc',
+    headerBgColor: '#110d1a',
+    hamburgerBgColor: '#110d1a',
+  },
+  {
+    id: 'molten',
+    label: 'Molten',
+    bgColor: '#0e0800',
+    boxColor: '#1c1100',
+    accentColor: '#fb923c',
+    headerBgColor: '#0e0800',
+    hamburgerBgColor: '#0e0800',
+  },
+  {
+    id: 'abyss',
+    label: 'Abyss',
+    // Monochromatic near-black + electric blue — pure depth
+    bgColor: '#040810',
+    boxColor: '#0a1120',
+    accentColor: '#3b82f6',
+    headerBgColor: '#040810',
+    hamburgerBgColor: '#040810',
+  },
+  {
+    id: 'carbon',
+    label: 'Carbon',
+    // Neutral charcoal + vivid cyan-white — industrial minimal
+    bgColor: '#111214',
+    boxColor: '#1c1e22',
+    accentColor: '#e2e8f0',
+    headerBgColor: '#111214',
+    hamburgerBgColor: '#111214',
+  },
+  {
+    id: 'rose-noir',
+    label: 'Rose Noir',
+    // Dark moody base + dusty rose — split-complementary warmth
+    bgColor: '#0e0a0b',
+    boxColor: '#1a1214',
+    accentColor: '#fb7185',
+    headerBgColor: '#0e0a0b',
+    hamburgerBgColor: '#0e0a0b',
+  },
+  {
+    id: 'copper',
+    label: 'Copper',
+    // Dark graphite + warm copper — analogous amber tones
+    bgColor: '#100c09',
+    boxColor: '#1e1510',
+    accentColor: '#d97706',
+    headerBgColor: '#100c09',
+    hamburgerBgColor: '#100c09',
+  },
+  // ── LIGHT ─────────────────────────────────────────────────────
+  {
+    id: 'paper',
+    label: 'Paper',
+    bgColor: '#f5f0e8',
+    boxColor: '#ebe4d5',
+    accentColor: '#1a1a1a',
+    headerBgColor: '#ede7d8',
+    hamburgerBgColor: '#ede7d8',
+  },
+  {
+    id: 'purple-pop',
+    label: 'Purple Pop',
+    bgColor: '#f6f2ea',
+    boxColor: '#efe8ff',
+    accentColor: '#7b2cbf',
+    headerBgColor: '#f1ece2',
+    hamburgerBgColor: '#f1ece2',
   },
   {
     id: 'sunset',
@@ -66,7 +153,18 @@ export const THEME_PRESETS: ThemePreset[] = [
     headerBgColor: '#e6f7f0',
     hamburgerBgColor: '#e6f7f0',
   },
+  {
+    id: 'slate',
+    label: 'Slate',
+    // Cool blue-grey bg + deep navy — monochromatic cool, calm authority
+    bgColor: '#f0f4f8',
+    boxColor: '#dde6f0',
+    accentColor: '#1e3a5f',
+    headerBgColor: '#e8eef5',
+    hamburgerBgColor: '#e8eef5',
+  },
 ];
+
 
 export const DEFAULT_THEME_PREFERENCES: ThemePreferences = {
   presetId: THEME_PRESETS[0].id,

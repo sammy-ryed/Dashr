@@ -86,6 +86,21 @@ export const POST = withErrorHandling(async (request: NextRequest) => {
   const rapidBlock = await checkRapidOrderCreation(adminClient, user.id);
   if (rapidBlock) return apiError(rapidBlock, 429);
 
+  // Phone number guard: orders above ₹200 require a phone number on file (#4)
+  if (orderValue > 200) {
+    const { data: customerProfile } = await adminClient
+      .from('users')
+      .select('phone')
+      .eq('id', user.id)
+      .single();
+    if (!customerProfile?.phone) {
+      return apiError(
+        'A phone number is required for orders above ₹200. Add one in your profile settings.',
+        422,
+      );
+    }
+  }
+
   const { data: inserted, error: insertError } = await authClient
     .from('orders')
     .insert({

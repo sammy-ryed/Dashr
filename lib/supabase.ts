@@ -1,4 +1,6 @@
 import { createBrowserClient } from '@supabase/ssr';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
+
 
 let _client: ReturnType<typeof createBrowserClient> | null = null;
 
@@ -25,6 +27,24 @@ export function createClient() {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
+
+    // Silently clear stale/invalid refresh tokens so users don't see
+    // 'Invalid Refresh Token: Refresh Token Not Found' console errors.
+    // This fires when the stored session has expired server-side.
+    _client.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+
+      if (
+        event === 'SIGNED_OUT' ||
+        (event === 'TOKEN_REFRESHED' && !session)
+      ) {
+        // Session is gone — clear any lingering localStorage keys Supabase may
+        // have left behind so the next page load starts fresh.
+        const prefix = 'sb-';
+        Object.keys(localStorage)
+          .filter((k) => k.startsWith(prefix))
+          .forEach((k) => localStorage.removeItem(k));
+      }
+    });
   }
   return _client;
 }

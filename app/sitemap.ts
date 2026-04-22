@@ -2,30 +2,33 @@ import type { MetadataRoute } from 'next';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://dashr.app';
 
-// Update these dates only when the respective page content actually changes.
-// Using new Date() would incorrectly signal a modification on every deploy,
-// wasting Google's crawl budget.
 const LAST_MODIFIED = {
-  home:         new Date('2026-04-19'),
-  login:        new Date('2026-04-19'),
-  legal:        new Date('2026-04-01'),
+  landing:  new Date('2026-04-23'),
+  login:    new Date('2026-04-19'),
+  legal:    new Date('2026-04-01'),
 };
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
-      // / redirects to /login or /order — still worth indexing as the root
+      // Public landing page — primary entry for unauthenticated users & Google crawl
       url: `${APP_URL}/`,
-      lastModified: LAST_MODIFIED.home,
-      changeFrequency: 'monthly',
-      priority: 0.8,
+      lastModified: LAST_MODIFIED.landing,
+      changeFrequency: 'weekly',
+      priority: 1.0,
     },
     {
-      // Primary entry point — where users land and sign up
+      // Alternate landing route (canonical same as /)
+      url: `${APP_URL}/landing`,
+      lastModified: LAST_MODIFIED.landing,
+      changeFrequency: 'weekly',
+      priority: 0.9,
+    },
+    {
       url: `${APP_URL}/login`,
       lastModified: LAST_MODIFIED.login,
       changeFrequency: 'monthly',
-      priority: 1,
+      priority: 0.8,
     },
     {
       url: `${APP_URL}/privacy`,
@@ -47,4 +50,3 @@ export default function sitemap(): MetadataRoute.Sitemap {
     },
   ];
 }
-

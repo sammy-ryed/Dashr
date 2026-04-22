@@ -53,9 +53,11 @@ body {
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 0.12rem solid var(--yellow);
   display: flex; 
-  align-items: center; 
+  align-items: stretch;   /* stretch so all children fill full nav height */
   justify-content: space-between;
-  padding: clamp(0.9rem, 3vw, 1.3rem) clamp(1rem, 5vw, 4rem);
+  /* Fixed height via clamp — no px, stays consistent across all pages */
+  min-height: clamp(3rem, 8vw, 4rem);
+  padding: 0 clamp(1rem, 5vw, 4rem);
   box-shadow: 0 2px 8px rgba(233,181,11,0.06);
   transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -86,7 +88,10 @@ body {
   font-weight: 900;
   letter-spacing: 0.06em;
   color: var(--yellow);
-  display: flex; align-items: center; gap: 0.4rem;
+  display: flex;
+  align-items: center;
+  align-self: center;   /* center vertically in the stretch nav */
+  gap: 0.4rem;
   padding: 0.5rem 0;
   text-decoration: none;
   transition: filter 0.2s ease;
@@ -111,12 +116,13 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0 1.2rem;
+  padding: 0 clamp(0.6rem, 1.5vw, 1.2rem);
   border-left: 0.06rem solid #2a2a2a;
   transition: background 0.15s ease;
   cursor: pointer;
   background: transparent;
   border: none;
+  align-self: stretch; /* fills full nav height like the tab links */
 }
 .nav-user:hover {
   background: rgba(233, 181, 11, 0.08);
@@ -147,37 +153,51 @@ body {
   letter-spacing: 0.08em;
   color: var(--muted);
 }
-.nav-links { display: flex; list-style: none; }
+.nav-links { 
+  display: flex; 
+  list-style: none;
+  align-self: stretch;  /* fill full nav height */
+  margin: 0;
+  padding: 0;
+}
+.nav-links li {
+  display: flex;
+  align-items: stretch;
+}
 .nav-links a {
   font-family: var(--mono);
-  font-size: 0.7rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.12em;
-  color: var(--muted); text-decoration: none;
-  padding: 0 1.4rem;
-  display: flex; align-items: center;
+  font-size: clamp(0.58rem, 1.2vw, 0.72rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0 clamp(0.7rem, 1.5vw, 1.4rem);
+  display: flex;
+  align-items: center;
   border-left: 0.06rem solid #2a2a2a;
   transition: color 0.15s ease;
   position: relative;
+  white-space: nowrap;
 }
 .nav-links a:hover {
   color: var(--yellow);
 }
 .nav-links a.active { 
   color: var(--white);
-  transform: none;
   filter: drop-shadow(0 0 0.3rem rgba(233,181,11,0.15));
 }
 .nav-links a.active::after {
-  content: ''; position: absolute; bottom: 0; left: 0;
-  width: 100%; height: 0.18rem; background: var(--yellow);
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 0.18rem;
+  background: var(--yellow);
 }
 
 @media (max-width: 1200px) {
-  .nav-links a {
-    padding: 0 0.9rem;
-    font-size: 0.64rem;
-  }
-
   .nav-online-btn {
     margin: auto 0.5rem;
     padding: 0.35rem 0.75rem;
@@ -185,7 +205,7 @@ body {
   }
 
   .nav-user {
-    padding: 0 0.85rem;
+    padding: 0 clamp(0.5rem, 1.2vw, 0.85rem);
   }
 
   .nav-user-name {
@@ -197,11 +217,6 @@ body {
 }
 
 @media (max-width: 1024px) {
-  .nav-links a {
-    padding: 0 0.7rem;
-    font-size: 0.6rem;
-  }
-
   .nav-user-name {
     display: none;
   }
@@ -982,12 +997,12 @@ select.inp option { background: var(--surf2); }
 }
 
 .theme-panel.is-open {
-  max-height: 44rem;
+  max-height: 80rem;  /* tall enough for all 10 theme swatches + fine-tune section */
   opacity: 1;
   transform: scaleY(1);
   padding: 0.9rem;
   border-color: var(--yellow);
-  box-shadow: 0.2rem 0.2rem 0 rgba(0, 0, 0, 0.15);
+  box-shadow: 0.25rem 0.25rem 0 rgba(233,181,11,0.25), inset 0 0 0 0.05rem rgba(233,181,11,0.08);
 }
 
 .theme-panel-title {
@@ -1090,7 +1105,7 @@ select.inp option { background: var(--surf2); }
   }
 
   .theme-panel.is-open {
-    max-height: 52rem;
+    max-height: 90rem;
     padding: 1rem;
   }
 }

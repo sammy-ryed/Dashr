@@ -10,7 +10,9 @@ import { ORDER_STATUS_STEPS, FEATURES, UPI_ID } from '@/lib/config';
 import Nav from '@/components/Nav';
 import RatingModal from '@/components/RatingModal';
 import ReportModal from '@/components/ReportModal';
+import ChatDrawer from '@/components/ChatDrawer';
 import type { Order } from '@/types';
+
 
 const RATING_MODAL_DELAY_MS = 300;
 
@@ -342,6 +344,16 @@ export default function OrderStatusPage() {
           reportedId={resolvedAgentId}
           reportedName={resolvedAgentName}
           orderId={order.id}
+        />
+      )}
+
+      {/* In-app chat — visible once a dasher is assigned */}
+      {user && order.agent_id && (
+        <ChatDrawer
+          orderId={order.id}
+          currentUserId={user.id}
+          otherPartyName={agentInfo?.name || 'Dasher'}
+          orderStatus={order.status}
         />
       )}
     </>

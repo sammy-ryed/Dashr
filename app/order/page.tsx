@@ -8,7 +8,9 @@ import { getUserSafe } from '@/lib/auth';
 import { COMMISSION_FLOORS, AGENT_FLOAT_THRESHOLD, ZONE_LABELS, SRM_HOSTELS_NEW, ABODE_BLOCKS } from '@/lib/config';
 import Nav from '@/components/Nav';
 import MarqueeBar from '@/components/MarqueeBar';
+import TipsOverlay from '@/components/TipsOverlay';
 import type { Zone } from '@/lib/config';
+
 
 export default function OrderPage() {
   const router = useRouter();
@@ -17,6 +19,8 @@ export default function OrderPage() {
   const [user, setUser] = useState<{ id: string; name: string; role: string } | null>(null);
   const [onlineCount, setOnlineCount] = useState(0);
   const [authLoading, setAuthLoading] = useState(true);
+  const [showTips, setShowTips] = useState(false);
+
 
   const [itemDescription, setItemDescription] = useState('');
   const [pickupLocation, setPickupLocation] = useState('');
@@ -41,12 +45,12 @@ export default function OrderPage() {
     async function init() {
       const authUser = await getUserSafe(supabase);
       if (authUser) {
-        const { data: profile } = await supabase.from('users').select('name, role, is_banned').eq('id', authUser.id).single();
-        const p = profile as { name: string; role: string; is_banned: boolean } | null;
+        const { data: profile } = await supabase.from('users').select('name, role, is_banned, has_seen_tips').eq('id', authUser.id).single();
+        const p = profile as { name: string; role: string; is_banned: boolean; has_seen_tips: boolean } | null;
         if (p) {
-          // Redirect banned users before they see the form
           if (p.is_banned) { router.push('/banned'); return; }
           setUser({ id: authUser.id, name: p.name || '', role: p.role });
+          if (!p.has_seen_tips) setShowTips(true);
         }
       }
       const { count } = await supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'agent').eq('is_online', true);
@@ -164,8 +168,10 @@ export default function OrderPage() {
 
   return (
     <>
+      {showTips && user && <TipsOverlay userId={user.id} role="customer" />}
       <Nav role={user?.role === 'admin' ? 'admin' : 'customer'} actualRole={user?.role} userName={user?.name} isLoading={authLoading} />
       <MarqueeBar />
+
 
       <div className="page-enter" style={{ minHeight: '85vh', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '2rem clamp(1rem,5vw,4rem)' }}>
         <div className="page-mock" style={{ width: '100%', maxWidth: '36rem' }}>
