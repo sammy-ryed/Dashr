@@ -8,6 +8,7 @@ import { getUserSafe } from '@/lib/auth';
 import { format, parseISO } from 'date-fns';
 import type { Order, User } from '@/types';
 import HamburgerThemePanel from '@/components/HamburgerThemePanel';
+import { useCollege } from '@/lib/college-context';
 
 interface AgentPayout {
   agent: User;
@@ -57,6 +58,7 @@ interface HealthData {
 export default function AdminPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { college } = useCollege();
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [agents, setAgents] = useState<User[]>([]);
@@ -330,7 +332,7 @@ export default function AdminPage() {
   return (
     <div>
       <nav className="nav">
-        <span className="nav-logo">DASHR<sup>SRM</sup></span>
+        <span className="nav-logo">DASHR<sup>{college.name}</sup></span>
         <ul className="nav-links">
           <li><span style={{ fontFamily: 'var(--mono)', fontSize: '0.7rem', color: 'var(--yellow)', padding: '0 1rem' }}>Admin</span></li>
         </ul>
@@ -353,7 +355,7 @@ export default function AdminPage() {
           <div className="mobile-menu-inner" onClick={(e) => e.stopPropagation()}>
             <div style={{ padding: '1.4rem', borderBottom: '0.14rem solid #2a2a2a' }}>
               <div className="nav-logo" style={{ padding: 0, fontSize: '1.4rem' }}>
-                DASHR<sup>SRM</sup>
+                DASHR<sup>{college.name}</sup>
               </div>
               <div style={{ marginTop: '0.6rem' }}>
                 <div className="type-label" style={{ color: 'var(--yellow)' }}>Admin Panel</div>

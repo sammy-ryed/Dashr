@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { getUserSafe } from '@/lib/auth';
+import { useCollege } from '@/lib/college-context';
 
 interface BanInfo {
   id: string;
@@ -17,6 +18,7 @@ interface BanInfo {
 export default function BannedPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { college } = useCollege();
   const [ban, setBan] = useState<BanInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [appealText, setAppealText] = useState('');
@@ -111,7 +113,7 @@ export default function BannedPage() {
   return (
     <div className="page-enter" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
       <div style={{ maxWidth: '32rem', width: '100%', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <div className="nav-logo" style={{ justifyContent: 'center', fontSize: '2rem' }}>DASHR<sup>SRM</sup></div>
+        <div className="nav-logo" style={{ justifyContent: 'center', fontSize: '2rem' }}>DASHR<sup>{college.name}</sup></div>
 
         <div style={{ textAlign: 'center' }}>
           <div className="type-h1" style={{ fontSize: '1.6rem' }}>

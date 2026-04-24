@@ -5,16 +5,25 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { getUserSafe } from '@/lib/auth';
-import { COMMISSION_FLOORS, AGENT_FLOAT_THRESHOLD, ZONE_LABELS, SRM_HOSTELS_NEW, ABODE_BLOCKS } from '@/lib/config';
+import { AGENT_FLOAT_THRESHOLD, ABODE_BLOCKS } from '@/lib/config';
 import Nav from '@/components/Nav';
 import MarqueeBar from '@/components/MarqueeBar';
 import TipsOverlay from '@/components/TipsOverlay';
-import type { Zone } from '@/lib/config';
+import { useCollege } from '@/lib/college-context';
 
 
 export default function OrderPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { college } = useCollege();
+
+  // Derived hostel lists from college config
+  const allHostels = college.hostels;
+  const hasCategories = allHostels.some(h => !!h.category);
+  const availableCategories = hasCategories
+    ? [...new Set(allHostels.map(h => h.category).filter((c): c is string => !!c))]
+    : [];
+  const hasSrmAbode = college.slug === 'srm';
 
   const [user, setUser] = useState<{ id: string; name: string; role: string } | null>(null);
   const [onlineCount, setOnlineCount] = useState(0);
@@ -23,23 +32,28 @@ export default function OrderPage() {
 
 
   const [itemDescription, setItemDescription] = useState('');
-  const [pickupLocation, setPickupLocation] = useState('');
-  const [zone, setZone] = useState<Zone>('on_campus');
+  const [selectedHotspot, setSelectedHotspot] = useState('');
+  const [pickupDetails, setPickupDetails] = useState('');
   const [locationType, setLocationType] = useState<'hostel' | 'abode' | 'other' | ''>('');
-  const [hostelCategory, setHostelCategory] = useState<'boys' | 'girls' | 'international' | ''>('');
+  const [hostelCategory, setHostelCategory] = useState<string>('');
   const [hostel, setHostel] = useState('');
   const [block, setBlock] = useState('');
   const [customLocation, setCustomLocation] = useState('');
   const [room, setRoom] = useState('');
   const [orderValue, setOrderValue] = useState('');
-  const [commission, setCommission] = useState<string>(String(COMMISSION_FLOORS.on_campus));
+  const [commission, setCommission] = useState<string>(String(college.commissionTiers.inside));
   const [commError, setCommError] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const minComm = COMMISSION_FLOORS[zone];
+  const activeHotspot = college.hotspots.find(h => h.id === selectedHotspot);
+  const isOutsideCampus = activeHotspot?.location === 'outside';
+  const minComm = isOutsideCampus ? college.commissionTiers.outside : college.commissionTiers.inside;
   const isAgentFloat = !orderValue || Number(orderValue) < AGENT_FLOAT_THRESHOLD;
+
+  const insideHotspots = college.hotspots.filter(h => h.location === 'inside');
+  const outsideHotspots = college.hotspots.filter(h => h.location === 'outside');
 
   useEffect(() => {
     async function init() {
@@ -77,13 +91,16 @@ export default function OrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handleZone(z: Zone) {
-    setZone(z);
-    const floor = COMMISSION_FLOORS[z];
-    const numComm = Number(commission) || 0;
-    if (numComm < floor) {
-      setCommission(String(floor));
-      setCommError('');
+  function handleHotspotSelect(hotspotId: string) {
+    setSelectedHotspot(hotspotId);
+    const spot = college.hotspots.find(h => h.id === hotspotId);
+    if (spot) {
+      const floor = college.commissionTiers[spot.location];
+      const numComm = Number(commission) || 0;
+      if (numComm < floor) {
+        setCommission(String(floor));
+        setCommError('');
+      }
     }
   }
 
@@ -91,7 +108,7 @@ export default function OrderPage() {
     const num = Number(commission) || 0;
     if (num < minComm) {
       setCommission(String(minComm));
-      setCommError(`Minimum is ₹${minComm} for ${ZONE_LABELS[zone]}`);
+      setCommError(`Minimum is ₹${minComm} for ${isOutsideCampus ? 'outside campus' : 'inside campus'}`);
       setTimeout(() => setCommError(''), 3000);
     } else {
       setCommError('');
@@ -107,7 +124,7 @@ export default function OrderPage() {
 
   async function placeOrder() {
     if (!itemDescription.trim()) { setError('Describe what you want'); return; }
-    if (!pickupLocation.trim()) { setError('Enter pickup location'); return; }
+    if (!selectedHotspot || !activeHotspot) { setError('Select where to pick up from'); return; }
     
     // Validate location selection
     let finalLocation = '';
@@ -115,21 +132,21 @@ export default function OrderPage() {
       if (!block) { setError('Select your Abode block'); return; }
       finalLocation = `Abode - Block ${block}`;
     } else if (locationType === 'hostel') {
-      if (!hostelCategory) { setError('Select hostel category'); return; }
+      if (hasCategories && !hostelCategory) { setError('Select hostel category'); return; }
       if (!hostel) { setError('Select your hostel'); return; }
       finalLocation = hostel;
     } else if (locationType === 'other') {
       if (!customLocation.trim()) { setError('Enter your location'); return; }
       finalLocation = customLocation.trim();
     } else {
-      setError('Select a location type');
+      setError('Select where to deliver');
       return;
     }
     
     if (!room.trim()) { setError('Enter your room number'); return; }
     if (!orderValue || Number(orderValue) <= 0) { setError('Enter order value'); return; }
     const commNum = Number(commission) || 0;
-    if (commNum < minComm) { setError(`Minimum commission for ${ZONE_LABELS[zone]} is ₹${minComm}`); return; }
+    if (commNum < minComm) { setError(`Minimum commission for ${isOutsideCampus ? 'outside campus' : 'inside campus'} is ₹${minComm}`); return; }
 
 
     setLoading(true);
@@ -141,8 +158,8 @@ export default function OrderPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           itemDescription: itemDescription.trim(),
-          pickupLocation: pickupLocation.trim(),
-          pickupZone: zone,
+          pickupLocation: pickupDetails ? `${activeHotspot!.name} — ${pickupDetails}` : activeHotspot!.name,
+          pickupZone: isOutsideCampus ? 'off_campus' : 'on_campus',
           deliveryHostel: finalLocation,
           deliveryRoom: room.trim(),
           orderValue: Number(orderValue),
@@ -203,24 +220,87 @@ export default function OrderPage() {
               />
             </div>
 
-            {/* Zone */}
+            {/* Pickup — hotspot chip selector */}
             <div>
-              <div className="type-label" style={{ marginBottom: '0.6rem' }}>Pickup Zone</div>
-              <div className="zone-grid">
-                {(Object.keys(ZONE_LABELS) as Zone[]).map((z) => (
-                  <button key={z} className={`zone-btn ${zone === z ? 'active' : ''}`} onClick={() => handleZone(z)}>
-                    {ZONE_LABELS[z]}
-                  </button>
-                ))}
-              </div>
+              <div className="type-label" style={{ marginBottom: '0.6rem' }}>Pickup from</div>
+
+              {insideHotspots.length > 0 && (
+                <>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '0.52rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '0.4rem' }}>Inside campus</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.8rem' }}>
+                    {insideHotspots.map((h) => (
+                      <button
+                        key={h.id}
+                        type="button"
+                        onClick={() => handleHotspotSelect(h.id)}
+                        style={{
+                          fontFamily: 'var(--mono)', fontSize: '0.68rem', fontWeight: 700,
+                          textTransform: 'uppercase', letterSpacing: '0.06em',
+                          padding: '0.5em 1em', border: '0.14rem solid',
+                          cursor: 'pointer', transition: 'all 0.15s ease',
+                          borderColor: selectedHotspot === h.id ? 'var(--ink)' : '#444',
+                          background: selectedHotspot === h.id ? 'var(--yellow)' : 'var(--surf2)',
+                          color: selectedHotspot === h.id ? 'var(--ink)' : 'var(--muted)',
+                          boxShadow: selectedHotspot === h.id ? '0.2rem 0.2rem 0 var(--ink)' : '0.15rem 0.15rem 0 #333',
+                        }}
+                      >
+                        {h.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {outsideHotspots.length > 0 && (
+                <>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '0.52rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '0.4rem' }}>Outside campus gate · ₹{college.commissionTiers.outside} min</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {outsideHotspots.map((h) => (
+                      <button
+                        key={h.id}
+                        type="button"
+                        onClick={() => handleHotspotSelect(h.id)}
+                        style={{
+                          fontFamily: 'var(--mono)', fontSize: '0.68rem', fontWeight: 700,
+                          textTransform: 'uppercase', letterSpacing: '0.06em',
+                          padding: '0.5em 1em', border: '0.14rem solid',
+                          cursor: 'pointer', transition: 'all 0.15s ease',
+                          borderColor: selectedHotspot === h.id ? 'var(--danger)' : '#444',
+                          background: selectedHotspot === h.id ? 'var(--danger)' : 'var(--surf2)',
+                          color: selectedHotspot === h.id ? '#fff' : 'var(--muted)',
+                          boxShadow: selectedHotspot === h.id ? '0.2rem 0.2rem 0 var(--danger)' : '0.15rem 0.15rem 0 #333',
+                        }}
+                      >
+                        {h.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Extra details field — stall number, item context, etc. */}
+              {activeHotspot && (
+                <div className="inp-wrap" data-label="Stall / Extra Details (optional)" style={{ marginTop: '0.8rem' }}>
+                  <input
+                    className="inp"
+                    id="order-pickup-detail"
+                    type="text"
+                    placeholder={`e.g. stall 3, counter near entrance...`}
+                    value={pickupDetails}
+                    onChange={(e) => setPickupDetails(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {/* Outside campus warning */}
+              {isOutsideCampus && (
+                <div className="notice notice-y" style={{ marginTop: '0.6rem' }}>
+                  Outside campus pickup — min commission ₹{college.commissionTiers.outside}. Dasher walks ~{activeHotspot?.walkMinutesFromFar} min.
+                </div>
+              )}
             </div>
 
-            {/* Pickup */}
-            <div className="inp-wrap" data-label="Pickup Location">
-              <input className="inp" id="order-pickup" type="text" placeholder="Nilgiri canteen, stall 3..." value={pickupLocation} onChange={(e) => setPickupLocation(e.target.value)} />
-            </div>
-
-            {/* Location Type Selection */}
+            {/* Delivery Location tabs */}
             <div>
               <div className="type-label" style={{ marginBottom: '0.6rem' }}>Delivery Location</div>
               <div className="zone-grid">
@@ -237,19 +317,21 @@ export default function OrderPage() {
                 >
                   Hostel
                 </button>
-                <button
-                  type="button"
-                  className={`zone-btn ${locationType === 'abode' ? 'active' : ''}`}
-                  onClick={() => {
-                    setLocationType('abode');
-                    setHostelCategory('');
-                    setHostel('');
-                    setBlock('');
-                    setCustomLocation('');
-                  }}
-                >
-                  Abode
-                </button>
+                {hasSrmAbode && (
+                  <button
+                    type="button"
+                    className={`zone-btn ${locationType === 'abode' ? 'active' : ''}`}
+                    onClick={() => {
+                      setLocationType('abode');
+                      setHostelCategory('');
+                      setHostel('');
+                      setBlock('');
+                      setCustomLocation('');
+                    }}
+                  >
+                    Abode
+                  </button>
+                )}
                 <button
                   type="button"
                   className={`zone-btn ${locationType === 'other' ? 'active' : ''}`}
@@ -269,32 +351,34 @@ export default function OrderPage() {
             {/* Hostel Section */}
             {locationType === 'hostel' && (
               <>
-                {/* Hostel Category */}
-                <div>
-                  <div className="type-label" style={{ marginBottom: '0.6rem' }}>Hostel Category</div>
-                  <div className="zone-grid">
-                    {(['boys', 'girls', 'international'] as const).map((cat) => (
-                      <button
-                        key={cat}
-                        className={`zone-btn ${hostelCategory === cat ? 'active' : ''}`}
-                        onClick={() => {
-                          setHostelCategory(cat);
-                          setHostel('');
-                        }}
-                      >
-                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                      </button>
-                    ))}
+                {/* Category tabs — shown for colleges that use them (e.g. SRM: boys/girls/international) */}
+                {hasCategories && (
+                  <div>
+                    <div className="type-label" style={{ marginBottom: '0.6rem' }}>Hostel Category</div>
+                    <div className="zone-grid">
+                      {availableCategories.map((cat) => (
+                        <button
+                          key={cat}
+                          className={`zone-btn ${hostelCategory === cat ? 'active' : ''}`}
+                          onClick={() => { setHostelCategory(cat); setHostel(''); }}
+                        >
+                          {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {/* Hostel Selection */}
-                {hostelCategory && (
+                {/* Hostel picker — always show for flat-list colleges, show after category pick for categorised ones */}
+                {(hasCategories ? !!hostelCategory : true) && (
                   <div className="inp-wrap" data-label="Hostel">
                     <select className="inp" id="order-hostel" value={hostel} onChange={(e) => setHostel(e.target.value)}>
                       <option value="">Select...</option>
-                      {SRM_HOSTELS_NEW[hostelCategory].map((h) => (
-                        <option key={h} value={h}>{h}</option>
+                      {(hasCategories
+                        ? allHostels.filter(h => h.category === hostelCategory)
+                        : allHostels
+                      ).map((h) => (
+                        <option key={h.id} value={h.name}>{h.name}</option>
                       ))}
                     </select>
                   </div>
@@ -362,7 +446,7 @@ export default function OrderPage() {
                 <button type="button" className="comm-step" onClick={() => adjustCommission(5)} aria-label="Increase">+</button>
               </div>
               {commError && <div className="comm-err">{commError}</div>}
-              <div className="comm-hint">MIN ₹{minComm} for {ZONE_LABELS[zone]} · Higher = faster pickup</div>
+              <div className="comm-hint">MIN ₹{minComm} for {isOutsideCampus ? 'outside campus' : 'inside campus'} · Higher = faster pickup</div>
             </div>
 
             <div className="phone-notice">

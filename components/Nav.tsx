@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import NotificationBell from '@/components/NotificationBell';
 import HamburgerThemePanel from '@/components/HamburgerThemePanel';
+import { useCollege } from '@/lib/college-context';
 
 interface NavProps {
   role?: 'customer' | 'agent' | 'admin';
@@ -18,6 +19,7 @@ interface NavProps {
 }
 
 export default function Nav({ role, actualRole, userName, isOnline, onToggleOnline, isLoading }: NavProps) {
+  const { college } = useCollege();
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -165,7 +167,7 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
     <>
       <nav className={`nav ${navHidden && !menuOpen ? 'nav-hidden' : ''}`}>
         <Link href="/" className="nav-logo">
-          DASHR<sup>SRM</sup>
+          DASHR<sup>{college.name}</sup>
         </Link>
 
         {/* Desktop links */}
@@ -251,7 +253,7 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
             {/* User info */}
             <div style={{ padding: '1.4rem', borderBottom: '0.14rem solid #2a2a2a' }}>
               <div className="nav-logo" style={{ padding: 0, fontSize: '1.4rem' }}>
-                DASHR<sup>SRM</sup>
+                DASHR<sup>{college.name}</sup>
               </div>
               {userName && (
                 <Link href="/profile" style={{ display: 'block', textDecoration: 'none' }} onClick={() => setMenuOpen(false)}>
@@ -343,7 +345,7 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
             <div className="about-header">
               <div>
                 <div className="about-label">THE TEAM BEHIND</div>
-                <div className="about-title">DASHR<sup>SRM</sup></div>
+                <div className="about-title">DASHR<sup>{college.name}</sup></div>
               </div>
               <button className="about-close" onClick={() => setShowAbout(false)} aria-label="Close">✕</button>
             </div>
@@ -421,7 +423,7 @@ export default function Nav({ role, actualRole, userName, isOnline, onToggleOnli
 
               {/* Footer note */}
               <div className="about-footer-note">
-                Built at SRM — two hostel kids who got hungry and decided to fix it.
+                Built at {college.name} — two hostel kids who got hungry and decided to fix it.
               </div>
             </div>
           </div>

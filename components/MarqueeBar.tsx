@@ -1,12 +1,10 @@
+'use client';
+
+import { useCollege } from '@/lib/college-context';
+
 export default function MarqueeBar() {
-  const items = [
-    'SRM IST Campus Delivery',
-    'Dashers on demand',
-    'On Campus · Shiv Temple · Potheri · Aborde',
-    'Earn commission on your schedule',
-    'No shop involvement — just students',
-    'Live order tracking',
-  ];
+  const { college } = useCollege();
+  const items = college.campusSlang;
 
   return (
     <div className="marquee-bar">
@@ -20,3 +18,4 @@ export default function MarqueeBar() {
     </div>
   );
 }
+

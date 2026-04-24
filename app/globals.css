@@ -313,7 +313,7 @@ body {
   display: flex;
   gap: 0;
   width: max-content;
-  animation: scroll 22s linear infinite;
+  animation: scroll 55s linear infinite;
 }
 
 .marquee-bar:hover .marquee-track {
@@ -1875,3 +1875,160 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   .about-photo { width: 3.8rem; height: 3.8rem; }
   .about-card-name { font-size: 0.95rem; }
 }
+
+/* ── PAGE TRANSITIONS ─────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(1rem); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter {
+  animation: fadeInUp 0.35s cubic-bezier(0.23,1,0.32,1) both;
+}
+
+/* ── ORDER CARD UPGRADES ──────────────────────────────── */
+.order-card {
+  transition: all 0.2s cubic-bezier(0.23,1,0.32,1);
+}
+.order-card:hover {
+  transform: translateY(-3px) translateX(-1px);
+}
+
+/* ── COMMISSION STEP BUTTONS ──────────────────────────── */
+.comm-step {
+  background: var(--surf2);
+  border: 0.14rem solid var(--yellow);
+  color: var(--yellow);
+  font-family: var(--mono);
+  font-size: 1.2rem;
+  font-weight: 700;
+  width: 2.4rem;
+  height: 2.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  box-shadow: 0.15rem 0.15rem 0 var(--yellow);
+}
+.comm-step:hover {
+  background: var(--yellow);
+  color: var(--ink);
+  transform: translate(-0.1rem,-0.1rem);
+  box-shadow: 0.28rem 0.28rem 0 var(--yellow-d);
+}
+.comm-step:active {
+  transform: translate(0.05rem,0.05rem);
+  box-shadow: none;
+}
+.comm-err {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--danger);
+  margin-top: 0.4rem;
+  letter-spacing: 0.04em;
+  animation: fadeInUp 0.2s ease;
+}
+
+/* ── COMM WIDGET GLOW ─────────────────────────────────── */
+.comm-wrap:focus-within {
+  border-color: var(--yellow);
+  box-shadow: var(--sh-y), 0 0 1.5rem rgba(233,181,11,0.1);
+}
+
+/* ── PHONE NOTICE ─────────────────────────────────────── */
+.phone-notice {
+  background: var(--surf2);
+  border: 0.12rem solid #2a2a2a;
+  border-left: 0.3rem solid var(--muted);
+  padding: 0.8rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: #888;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+}
+.phone-notice-icon {
+  flex-shrink: 0;
+  color: var(--muted);
+  margin-top: 0.05rem;
+}
+.phone-notice strong {
+  color: var(--white);
+}
+
+/* ── STATUS TRACKER UPGRADES ──────────────────────────── */
+@keyframes pulse-step {
+  0%, 100% { box-shadow: 0.2rem 0.2rem 0 var(--yellow), 0 0 0 0 rgba(233,181,11,0.4); }
+  50%       { box-shadow: 0.2rem 0.2rem 0 var(--yellow), 0 0 0 0.5rem rgba(233,181,11,0); }
+}
+.status-dot.active {
+  animation: pulse-step 1.8s ease-in-out infinite;
+}
+
+/* ── DELIVERED SUCCESS PULSE ──────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: var(--sh); }
+  50%       { box-shadow: 0.4rem 0.4rem 0 var(--ink), 0 0 2rem rgba(233,181,11,0.4); }
+}
+
+/* ── TRACKER HEAD GLOW (active orders) ─────────────────── */
+.tracker {
+  transition: box-shadow 0.3s ease;
+}
+.tracker:hover {
+  box-shadow: 0.6rem 0.6rem 0 rgba(233,181,11,0.3);
+}
+
+/* ── IMPROVED INPUTS ──────────────────────────────────── */
+.inp-wrap {
+  transition: all 0.2s cubic-bezier(0.23,1,0.32,1);
+}
+.inp-wrap:focus-within {
+  transform: translateY(-1px);
+}
+
+/* ── BADGE PULSE FOR PENDING ──────────────────────────── */
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+.badge-y-pulse {
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+/* ── EMPTY STATE IMPROVEMENTS ─────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 4rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+.empty-state-icon {
+  font-size: 3rem;
+  line-height: 1;
+  opacity: 0.3;
+  animation: fadeInUp 0.4s ease;
+}
+
+/* ── STAT CARD HOVER GLOW ─────────────────────────────── */
+.stat-card:hover {
+  box-shadow: 0.5rem 0.5rem 0 var(--yellow);
+  border-color: var(--yellow);
+}
+
+/* ── MOBILE ORDER FORM ────────────────────────────────── */
+@media (max-width: 768px) {
+  .page-mock {
+    border-left: none;
+    border-right: none;
+    padding: 1.4rem 1.2rem;
+  }
+}
+

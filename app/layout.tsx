@@ -2,8 +2,10 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { Courier_Prime } from 'next/font/google';
+import { headers } from 'next/headers';
 import ThemeBootstrap from '@/components/ThemeBootstrap';
 import { getThemeBootstrapScript } from '@/lib/theme-preferences';
+import { CollegeProvider } from '@/lib/college-context';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://dashr.app';
 const courierPrime = Courier_Prime({
@@ -20,28 +22,15 @@ export const metadata: Metadata = {
     default: 'DASHR',
     template: '%s | DASHR',
   },
-
   description:
-    'DASHR is a student-run delivery service at SRM IST. Order food, stationery, or anything on campus and have a verified student dasher drop it at your hostel room. No walking required.',
-  keywords: [
-    'SRM delivery', 'campus delivery', 'SRM IST', 'hostel delivery',
-    'DASHR', 'SRM food delivery', 'SRM Kattankulathur', 'student delivery',
-    'deliver to hostel', 'SRM campus app',
-  ],
+    'DASHR is a student-run campus delivery platform. Order food, stationery, or anything on campus and have a verified student dasher drop it at your hostel room. No walking required.',
   authors: [{ name: 'DASHR Team' }],
   category: 'food delivery',
-  alternates: {
-    canonical: APP_URL,
-  },
+  alternates: { canonical: APP_URL },
   robots: {
     index: true,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
   },
   openGraph: {
     type: 'website',
@@ -49,27 +38,13 @@ export const metadata: Metadata = {
     url: APP_URL,
     siteName: 'DASHR',
     title: 'DASHR',
-
-    description:
-      'Order anything on or around SRM IST campus and a verified student dasher will deliver it to your hostel room. No walking. No excuses.',
-    images: [
-      {
-        url: '/og-image.png',
-        width: 1200,
-        height: 630,
-        alt: 'DASHR — SRM Campus Delivery',
-        // WhatsApp uses og:image directly — ensure image is < 300KB and >= 300x200
-      },
-    ],
+    description: 'Order anything on campus and a verified student dasher will deliver it to your hostel room. No walking. No excuses.',
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'DASHR — Campus Delivery' }],
   },
   twitter: {
     card: 'summary_large_image',
-    site: '@dashr_srm',
-    creator: '@dashr_srm',
     title: 'DASHR',
-    description:
-      'Order anything on or around SRM IST campus and a verified student dasher will deliver it to your hostel room. No walking. No excuses.',
-
+    description: 'Order anything on campus. Fellow students deliver it. No cap.',
     images: ['/og-image.png'],
   },
   manifest: '/manifest.json',
@@ -78,19 +53,11 @@ export const metadata: Metadata = {
     { rel: 'icon', url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
     { rel: 'apple-touch-icon', url: '/apple-touch-icon.png', sizes: '180x180' },
   ],
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'DASHR',
-  },
-  formatDetection: {
-    telephone: false,
-  },
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'DASHR' },
+  formatDetection: { telephone: false },
   other: {
     'msapplication-TileColor': '#0f0f0f',
     'msapplication-config': '/browserconfig.xml',
-    // WhatsApp / LinkedIn use og: tags — covered above
-    // Explicit og:image:type helps WhatsApp resolve the preview
     'og:image:type': 'image/png',
     'og:image:width': '1200',
     'og:image:height': '630',
@@ -104,19 +71,22 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const headersList = await headers();
+  const slug = headersList.get('x-college-slug') ?? 'srm';
+
   return (
     <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className={courierPrime.variable}>
         <Script
           id="theme-bootstrap"
           strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: getThemeBootstrapScript(),
-          }}
+          dangerouslySetInnerHTML={{ __html: getThemeBootstrapScript() }}
         />
         <ThemeBootstrap />
-        {children}
+        <CollegeProvider slug={slug}>
+          {children}
+        </CollegeProvider>
         <Script id="dashr-sw-register" strategy="afterInteractive">
           {`if ('serviceWorker' in navigator) {
               window.addEventListener('load', function () {

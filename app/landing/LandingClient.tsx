@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import HamburgerThemePanel from '@/components/HamburgerThemePanel';
+import { useCollege } from '@/lib/college-context';
 
 const HOW_CUSTOMER = [
   { n: '01', title: 'DROP YOUR ORDER', body: 'Tell us what you want and where to pick it up. Maggi? Red Bull? That one printer at A-block? We don\'t judge.' },
@@ -33,6 +34,7 @@ const FAQS = [
 ];
 
 export default function LandingClient() {
+  const { college } = useCollege();
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -48,7 +50,7 @@ export default function LandingClient() {
         padding: 'clamp(0.9rem,3vw,1.3rem) clamp(1rem,5vw,4rem)',
         backdropFilter: 'blur(12px)',
       }}>
-        <div className="nav-logo">DASHR<sup>SRM</sup></div>
+        <div className="nav-logo">DASHR<sup>{college.name}</sup></div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
           <Link href="/login" className="btn btn-ghost btn-sm" style={{ display: 'none' }} id="nav-login-desktop">Sign In</Link>
           <Link href="/login" className="btn btn-primary btn-sm">Get Started</Link>
@@ -71,7 +73,7 @@ export default function LandingClient() {
         <div className="mobile-menu" onClick={() => setMenuOpen(false)}>
           <div className="mobile-menu-inner" onClick={(e) => e.stopPropagation()}>
             <div style={{ padding: '1.4rem', borderBottom: '0.14rem solid #2a2a2a' }}>
-              <div className="nav-logo" style={{ padding: 0, fontSize: '1.4rem' }}>DASHR<sup>SRM</sup></div>
+              <div className="nav-logo" style={{ padding: 0, fontSize: '1.4rem' }}>DASHR<sup>{college.name}</sup></div>
               <div className="type-label" style={{ marginTop: '0.4rem', fontSize: '0.55rem' }}>Customize your vibe</div>
             </div>
             <div style={{ flex: 1, padding: '0.8rem 0' }}>
@@ -98,12 +100,12 @@ export default function LandingClient() {
 
         <div style={{ maxWidth: '80rem', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%,28rem),1fr))', gap: '3rem', alignItems: 'center' }}>
           <div>
-            <div className="sec-label" style={{ marginBottom: '1.5rem' }}>Campus Delivery · SRM IST</div>
+            <div className="sec-label" style={{ marginBottom: '1.5rem' }}>{college.tagline}</div>
             <h1 className="type-hero" style={{ marginBottom: '1.5rem', lineHeight: 0.88 }}>
               TOO LAZY<br />TO WALK?<br /><span>SAME.</span>
             </h1>
             <p style={{ fontFamily: 'var(--mono)', fontSize: 'clamp(0.75rem,2vw,0.9rem)', color: '#aaa', lineHeight: 1.8, maxWidth: '28rem', marginBottom: '2rem' }}>
-              DASHR connects SRM students who want stuff delivered with students who need money.
+              DASHR connects {college.name} students who want stuff delivered with students who need money.
               It&apos;s capitalism, but make it <strong style={{ color: 'var(--yellow)' }}>cute</strong>.
             </p>
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
@@ -150,7 +152,7 @@ export default function LandingClient() {
       {/* ── ROAST TICKER ── */}
       <div className="marquee-bar" style={{ borderTop: '0.14rem solid var(--ink)' }}>
         <div className="marquee-track">
-          {[...ROASTS, ...ROASTS].map((r, i) => (
+          {[...college.campusSlang, ...college.campusSlang].map((r, i) => (
             <span key={i} className="marquee-item">{r}<span className="marquee-sep">◆</span></span>
           ))}
         </div>
@@ -192,7 +194,7 @@ export default function LandingClient() {
           <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <Link href="/login?role=agent" className="btn btn-primary btn-lg">Apply to Dash →</Link>
             <div style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              ✓ SRM ID required · ✓ Admin verified · ✓ Your call on every order
+              ✓ {college.studentIdLabel} required · ✓ Admin verified · ✓ Your call on every order
             </div>
           </div>
         </div>
@@ -229,12 +231,12 @@ export default function LandingClient() {
       {/* ── FINAL CTA ── */}
       <section style={{ padding: 'clamp(4rem,10vw,7rem) clamp(1rem,5vw,4rem)', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
         <div aria-hidden style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at center, rgba(233,181,11,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div className="sec-label" style={{ justifyContent: 'center', display: 'flex' }}>SRM IST · Kattankulathur</div>
+        <div className="sec-label" style={{ justifyContent: 'center', display: 'flex' }}>{college.fullName}</div>
         <h2 className="type-hero" style={{ margin: '1rem 0', maxWidth: '100%' }}>
           YOUR FOOD<br />IS <span>ONE TAP</span><br />AWAY.
         </h2>
         <p style={{ fontFamily: 'var(--mono)', fontSize: 'clamp(0.7rem,2vw,0.85rem)', color: 'var(--muted)', marginBottom: '2.5rem', maxWidth: '28rem', margin: '1rem auto 2.5rem' }}>
-          Join hundreds of SRM students who figured out that walking is optional.
+          Join {college.name} students who figured out that walking is optional.
         </p>
         <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/login" className="btn btn-primary btn-lg">Order Now →</Link>
@@ -244,7 +246,7 @@ export default function LandingClient() {
 
       {/* ── FOOTER ── */}
       <footer style={{ borderTop: '0.14rem solid #222', padding: '2rem clamp(1rem,5vw,4rem)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div className="nav-logo" style={{ fontSize: '1.2rem' }}>DASHR<sup>SRM</sup></div>
+        <div className="nav-logo" style={{ fontSize: '1.2rem' }}>DASHR<sup>{college.name}</sup></div>
         <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
           {[['Privacy', '/privacy'], ['Terms', '/terms'], ['Refund Policy', '/refund-policy'], ['Sign In', '/login']].map(([label, href]) => (
             <Link key={label} href={href} style={{ fontFamily: 'var(--mono)', fontSize: '0.58rem', color: '#555', textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '0.08em', transition: 'color 0.15s' }}
@@ -254,7 +256,7 @@ export default function LandingClient() {
           ))}
         </div>
         <div style={{ fontFamily: 'var(--mono)', fontSize: '0.55rem', color: '#333', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-          Built by SRM students, for SRM students.
+          Built by {college.name} students, for {college.name} students.
         </div>
       </footer>
     </div>

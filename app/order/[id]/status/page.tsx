@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase';
 import { getUserSafe } from '@/lib/auth';
@@ -18,6 +18,7 @@ const RATING_MODAL_DELAY_MS = 300;
 
 export default function OrderStatusPage() {
   const { id } = useParams() as { id: string };
+  const router = useRouter();
   const supabase = createClient();
 
   const [order, setOrder] = useState<Order | null>(null);
@@ -72,6 +73,10 @@ export default function OrderStatusPage() {
         filter: `id=eq.${id}`,
       }, (payload: { new: Partial<Order> }) => {
         setOrder((prev) => prev ? { ...prev, ...payload.new } : null);
+        // Refresh server data for picked_up / delivered transitions
+        if (payload.new.status === 'picked_up' || payload.new.status === 'delivered') {
+          router.refresh();
+        }
       })
       .subscribe();
 

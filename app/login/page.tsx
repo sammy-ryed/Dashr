@@ -5,6 +5,7 @@ import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import { getUserSafe } from '@/lib/auth';
+import { useCollege } from '@/lib/college-context';
 
 type Mode = 'signin' | 'signup' | 'forgot';
 type SignupStep = 'email' | 'otp' | 'password';
@@ -13,6 +14,7 @@ type ForgotStep = 'email' | 'otp';
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { college } = useCollege();
   
   // Safely access search params to avoid hydration mismatch
   const resetDone = searchParams ? searchParams.get('reset') === 'done' : false;
@@ -188,9 +190,9 @@ function LoginContent() {
         <div className="login-l">
           <div className="login-brand">DASHR.</div>
           <div className="login-tagline">
-            Built by SRM students.<br />
-            Run by SRM students.<br />
-            For SRM students.
+            Built by {college.name} students.<br />
+            Run by {college.name} students.<br />
+            For {college.name} students.
           </div>
         </div>
 

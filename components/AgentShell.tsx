@@ -9,6 +9,7 @@ import type { User } from '@/types';
 import NotificationBell from '@/components/NotificationBell';
 import HamburgerThemePanel from '@/components/HamburgerThemePanel';
 import TipsOverlay from '@/components/TipsOverlay';
+import { useCollege } from '@/lib/college-context';
 
 
 interface AgentShellProps {
@@ -25,6 +26,7 @@ function getWeekStart() {
 }
 
 export default function AgentShell({ children, forceCustomerMode }: AgentShellProps) {
+  const { college } = useCollege();
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -266,7 +268,7 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
     <div>
       {/* Top nav with hamburger */}
       <nav className={`nav ${navHidden && !menuOpen ? 'nav-hidden' : ''}`}>
-        <Link href="/" className="nav-logo">DASHR<sup>SRM</sup></Link>
+        <Link href="/" className="nav-logo">DASHR<sup>{college.name}</sup></Link>
 
         {/* Desktop nav links (visible on desktop, hidden on mobile) */}
         <ul className="nav-links">
@@ -318,7 +320,7 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
           <div className="mobile-menu-inner" onClick={(e) => e.stopPropagation()}>
             <div style={{ padding: '1.4rem', borderBottom: '0.14rem solid #2a2a2a' }}>
               <div className="nav-logo" style={{ padding: 0, fontSize: '1.4rem' }}>
-                DASHR<sup>SRM</sup>
+                DASHR<sup>{college.name}</sup>
               </div>
               <div style={{ marginTop: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <div className="nav-user-avatar" style={{ width: '2rem', height: '2rem', fontSize: '0.7rem' }}>{initial}</div>
@@ -403,7 +405,7 @@ export default function AgentShell({ children, forceCustomerMode }: AgentShellPr
           <div className="sb-head">
             <div className="sb-agent-name">{agent?.name?.split(' ')[0] || 'Dasher'}</div>
             <div className="sb-agent-meta">
-              {agent?.srm_id || 'SRM ID'} · ★ {agent?.rating?.toFixed(1)}
+              {agent?.srm_id || college.studentIdLabel} · ★ {agent?.rating?.toFixed(1)}
             </div>
             <div
               className="sb-toggle toggle-row"

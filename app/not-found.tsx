@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useCollege } from '@/lib/college-context';
 
 export default function NotFound() {
+  const { college } = useCollege();
   return (
     <div
       className="page-enter"
@@ -20,7 +22,7 @@ export default function NotFound() {
           className="nav-logo"
           style={{ justifyContent: 'center', fontSize: '1.8rem', marginBottom: '2rem' }}
         >
-          DASHR<sup>SRM</sup>
+          DASHR<sup>{college.name}</sup>
         </div>
 
         <div
