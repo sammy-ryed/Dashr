@@ -72,11 +72,11 @@ export default function OrderStatusPage() {
         table: 'orders',
         filter: `id=eq.${id}`,
       }, (payload: { new: Partial<Order> }) => {
-        setOrder((prev) => prev ? { ...prev, ...payload.new } : null);
-        // Refresh server data for picked_up / delivered transitions
-        if (payload.new.status === 'picked_up' || payload.new.status === 'delivered') {
-          router.refresh();
-        }
+        setOrder((prev) => {
+          if (!prev) return null;
+          // Preserve joined relations (agent) that Realtime doesn't include
+          return { ...prev, ...payload.new, agent: prev.agent };
+        });
       })
       .subscribe();
 
@@ -352,15 +352,13 @@ export default function OrderStatusPage() {
         />
       )}
 
-      {/* In-app chat — visible once a dasher is assigned.
-           offsetButton: shift the chat FAB upward so it doesn't overlap the Report Dasher button. */}
+      {/* In-app chat — visible once a dasher is assigned (bottom-left corner) */}
       {user && order.agent_id && (
         <ChatDrawer
           orderId={order.id}
           currentUserId={user.id}
           otherPartyName={agentInfo?.name || 'Dasher'}
           orderStatus={order.status}
-          offsetButton={!!(resolvedAgentId && order.status !== 'pending' && user && user.id === order.customer_id)}
         />
       )}
     </>

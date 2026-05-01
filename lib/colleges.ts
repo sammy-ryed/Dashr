@@ -60,6 +60,20 @@ export interface CollegeConfig {
   canteenName: string;
   /** Does this college use coloured department lanyards? */
   lanyardSystem: boolean;
+
+  // ── SEO / Geo fields ───────────────────────────────────────────
+  /** City name for SEO (e.g. "Chennai", "Bengaluru") */
+  city: string;
+  /** State / region for geo tags (e.g. "Tamil Nadu", "Karnataka") */
+  region: string;
+  /** Geo coordinates as "latitude;longitude" for meta geo.position */
+  geoPosition: string;
+  /** ICBM-format coordinates for legacy geo tags */
+  geoICBM: string;
+  /** SEO keywords specific to this campus location */
+  seoKeywords: string[];
+  /** Short SEO meta description for this campus */
+  seoDescription: string;
 }
 
 // ── COLLEGE REGISTRY ──────────────────────────────────────────
@@ -126,6 +140,19 @@ const COLLEGE_REGISTRY: Record<string, CollegeConfig> = {
 
     canteenName: 'canteen',
     lanyardSystem: false,
+
+    // SEO
+    city: 'Chennai',
+    region: 'Tamil Nadu',
+    geoPosition: '12.8231;80.0442',
+    geoICBM: '12.8231, 80.0442',
+    seoKeywords: [
+      'SRM delivery', 'SRM IST delivery', 'SRM campus delivery', 'SRM food delivery',
+      'DASHR SRM', 'DASHR Chennai', 'campus delivery Chennai', 'hostel delivery SRM',
+      'SRM Kattankulathur delivery', 'student delivery service Chennai',
+      'food delivery SRM IST', 'SRM hostel food order',
+    ],
+    seoDescription: 'DASHR at SRM IST Kattankulathur, Chennai — order food, stationery, or anything on campus and have a verified student dasher deliver it to your hostel room.',
   },
 
   // ── MAHE BENGALURU (Manipal Academy of Higher Education) ─────
@@ -177,6 +204,19 @@ const COLLEGE_REGISTRY: Record<string, CollegeConfig> = {
 
     canteenName: 'mart area',
     lanyardSystem: true,
+
+    // SEO
+    city: 'Bengaluru',
+    region: 'Karnataka',
+    geoPosition: '13.1080;77.5810',
+    geoICBM: '13.1080, 77.5810',
+    seoKeywords: [
+      'MAHE delivery', 'MAHE Bengaluru delivery', 'Manipal Bengaluru delivery',
+      'DASHR MAHE', 'DASHR Bangalore', 'DASHR Bengaluru', 'campus delivery Bangalore',
+      'hostel delivery MAHE', 'student delivery Bengaluru', 'Yelahanka campus delivery',
+      'food delivery Manipal Bengaluru', 'MAHE hostel food order',
+    ],
+    seoDescription: 'DASHR at MAHE Bengaluru (Manipal Academy of Higher Education), Yelahanka — order anything on campus and have a verified student dasher deliver it to your hostel room.',
   },
 
 };

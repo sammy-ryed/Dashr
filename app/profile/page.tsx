@@ -42,7 +42,8 @@ export default function ProfilePage() {
       setLoading(false);
     }
     load();
-  }, [router, supabase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleLogout() {
     setLoggingOut(true);

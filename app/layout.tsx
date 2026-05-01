@@ -6,6 +6,7 @@ import { headers } from 'next/headers';
 import ThemeBootstrap from '@/components/ThemeBootstrap';
 import { getThemeBootstrapScript } from '@/lib/theme-preferences';
 import { CollegeProvider } from '@/lib/college-context';
+import { getCollegeConfig } from '@/lib/colleges';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://dashr.app';
 const courierPrime = Courier_Prime({
@@ -74,9 +75,51 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const headersList = await headers();
   const slug = headersList.get('x-college-slug') ?? 'srm';
+  const college = getCollegeConfig(slug);
+
+  // JSON-LD structured data for location-based Google indexing
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'LocalBusiness',
+    name: `DASHR — ${college.fullName}`,
+    description: college.seoDescription,
+    url: APP_URL,
+    image: `${APP_URL}/og-image.png`,
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: college.city,
+      addressRegion: college.region,
+      addressCountry: 'IN',
+    },
+    geo: {
+      '@type': 'GeoCoordinates',
+      latitude: college.geoPosition.split(';')[0],
+      longitude: college.geoPosition.split(';')[1],
+    },
+    areaServed: {
+      '@type': 'Place',
+      name: college.fullName,
+      address: {
+        '@type': 'PostalAddress',
+        addressLocality: college.city,
+        addressRegion: college.region,
+        addressCountry: 'IN',
+      },
+    },
+    serviceType: 'Campus Delivery Service',
+    priceRange: '₹20-₹100',
+  };
 
   return (
     <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
+      <head>
+        {/* Location-based geo meta tags for Google indexing */}
+        <meta name="geo.region" content={`IN-${college.region === 'Tamil Nadu' ? 'TN' : college.region === 'Karnataka' ? 'KA' : college.region}`} />
+        <meta name="geo.placename" content={college.city} />
+        <meta name="geo.position" content={college.geoPosition} />
+        <meta name="ICBM" content={college.geoICBM} />
+        <meta name="keywords" content={college.seoKeywords.join(', ')} />
+      </head>
       <body className={courierPrime.variable}>
         <Script
           id="theme-bootstrap"
@@ -87,6 +130,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <CollegeProvider slug={slug}>
           {children}
         </CollegeProvider>
+        {/* JSON-LD structured data — placed in body per Next.js docs recommendation */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+        />
         <Script id="dashr-sw-register" strategy="afterInteractive">
           {`if ('serviceWorker' in navigator) {
               window.addEventListener('load', function () {

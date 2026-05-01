@@ -36,6 +36,8 @@ export default function AgentActivePage() {
   const [reportTarget, setReportTarget] = useState<{ id: string; name: string; orderId: string } | null>(null);
 
   useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
     async function load() {
       const user = await getUserSafe(supabase);
       if (!user) {
@@ -55,9 +57,8 @@ export default function AgentActivePage() {
       setOrders((data as Order[]) || []);
       setLoading(false);
 
-      // Real-time: auto-update active delivery status (#6)
+      // Real-time: auto-update active delivery status
       // try/catch: degrades gracefully if Realtime not enabled on this Supabase plan
-      let channel: ReturnType<typeof supabase.channel> | null = null;
       try {
         channel = supabase
           .channel(`agent-active-${user.id}`)
@@ -72,18 +73,23 @@ export default function AgentActivePage() {
             if (updated.status === 'delivered' || updated.status === 'cancelled') {
               setOrders((prev) => prev.filter((o) => o.id !== updated.id));
             } else {
-              setOrders((prev) => prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)));
+              // Preserve joined relations (customer) that Realtime doesn't include
+              setOrders((prev) => prev.map((o) => {
+                if (o.id !== updated.id) return o;
+                return { ...o, ...updated, customer: o.customer };
+              }));
             }
           })
           .subscribe();
       } catch {
         // Realtime unavailable — page still works, just no live updates
       }
-
-      return () => { if (channel) supabase.removeChannel(channel); };
     }
 
     load();
+
+    return () => { if (channel) supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 

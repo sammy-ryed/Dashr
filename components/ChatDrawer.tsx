@@ -118,7 +118,23 @@ export default function ChatDrawer({ orderId, currentUserId, otherPartyName, ord
       });
       const data = await res.json();
       if (!data.ok) { setError(data.error || 'Failed to send'); }
-      else { setInput(''); }
+      else {
+        // Optimistically add the message so it appears instantly
+        const optimisticMsg: Message = {
+          id: data.messageId,
+          order_id: orderId,
+          sender_id: currentUserId,
+          content: text,
+          created_at: data.created_at || new Date().toISOString(),
+          is_read: false,
+        };
+        setMessages((prev) => {
+          // Deduplicate in case Realtime already delivered it
+          if (prev.some((m) => m.id === optimisticMsg.id)) return prev;
+          return [...prev, optimisticMsg];
+        });
+        setInput('');
+      }
     } catch { setError('Network error.'); }
     setSending(false);
   }
@@ -133,8 +149,8 @@ export default function ChatDrawer({ orderId, currentUserId, otherPartyName, ord
   const formatTime = (iso: string) =>
     new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-  // The chat button sits at bottom-right; if offsetButton is true it sits higher
-  // to avoid clashing with a Report button at the default 1.5rem position
+  // The chat button sits at bottom-left; if offsetButton is true it sits higher
+  // to avoid clashing with other fixed buttons
   const buttonBottom = offsetButton ? '5.2rem' : '1.5rem';
 
   return (
@@ -144,18 +160,18 @@ export default function ChatDrawer({ orderId, currentUserId, otherPartyName, ord
         onClick={() => setOpen(true)}
         aria-label="Open chat"
         style={{
-          position: 'fixed', bottom: buttonBottom, right: '1.5rem', zIndex: 200,
+          position: 'fixed', bottom: buttonBottom, left: '1.5rem', zIndex: 200,
           width: '3.2rem', height: '3.2rem',
           background: 'var(--yellow)', color: 'var(--ink)',
           border: '0.18rem solid var(--ink)',
-          boxShadow: '0.3rem 0.3rem 0 var(--ink)',
+          boxShadow: '-0.3rem 0.3rem 0 var(--ink)',
           cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '1.3rem',
           transition: 'transform 0.15s, box-shadow 0.15s',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0.4rem 0.4rem 0 var(--ink)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0.3rem 0.3rem 0 var(--ink)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '-0.4rem 0.4rem 0 var(--ink)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '-0.3rem 0.3rem 0 var(--ink)'; }}
       >
         💬
         {unread > 0 && (
@@ -182,7 +198,7 @@ export default function ChatDrawer({ orderId, currentUserId, otherPartyName, ord
 
       {/* Drawer */}
       <div style={{
-        position: 'fixed', bottom: 0, right: 0, zIndex: 301,
+        position: 'fixed', bottom: 0, left: 0, zIndex: 301,
         width: 'min(100vw, 22rem)',
         height: open ? 'min(100dvh, 32rem)' : 0,
         overflow: 'hidden',
@@ -190,7 +206,7 @@ export default function ChatDrawer({ orderId, currentUserId, otherPartyName, ord
         background: 'var(--surf)',
         border: open ? '0.18rem solid var(--yellow)' : 'none',
         borderBottom: 'none',
-        boxShadow: open ? '-0.4rem -0.4rem 0 var(--yellow)' : 'none',
+        boxShadow: open ? '0.4rem -0.4rem 0 var(--yellow)' : 'none',
         transition: 'height 0.3s cubic-bezier(0.23,1,0.32,1)',
       }}>
         {/* Header */}
